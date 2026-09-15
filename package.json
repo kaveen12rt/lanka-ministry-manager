@@ -1,0 +1,21 @@
+{
+  "name": "lanka-ministry-manager",
+  "version": "1.0.0",
+  "description": "A full-stack web application (MERN) to manage and browse the directory of Sri Lankan Government Ministries, Departments, and Public Corporations.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kaveen12rt/lanka-ministry-manager.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kaveen12rt/lanka-ministry-manager/issues"
+  },
+  "homepage": "https://github.com/kaveen12rt/lanka-ministry-manager#readme"
+}
