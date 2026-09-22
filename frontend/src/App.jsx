@@ -22,13 +22,19 @@ function App() {
   const [ministerForm, setMinisterForm] = useState({ name: '', description: '' })
   const [editingMinisterId, setEditingMinisterId] = useState(null)
   const [ministriesList, setMinistriesList] = useState([])
+  const [departmentForm, setDepartmentForm] = useState({ name: '', ministryId: '' })
+  const [departmentNames, setDepartmentNames] = useState([''])
+  const [editingDepartmentId, setEditingDepartmentId] = useState(null)
+  const [departmentsList, setDepartmentsList] = useState([])
 
   const [registeredUsers, setRegisteredUsers] = useState([
     { name: 'Admin', password: ADMIN_PASSWORD, role: 'Admin' },
     { name: 'Sample User 01', password: 'sample123', role: 'Editor' },
   ])
 
-  const [formData, setFormData] = useState({ name: '', password: '', role: 'Editor' })
+  const [formData, setFormData] = useState({ name: '', password: '', ministries: [] })
+  const [editingUserId, setEditingUserId] = useState(null)
+  const [userEditForm, setUserEditForm] = useState({ name: '', password: '', ministries: [] })
   const [message, setMessage] = useState('Admin password is fixed as 0011 for this demo.')
 
   useEffect(() => {
@@ -51,6 +57,42 @@ function App() {
     }
 
     fetchUsers()
+
+    const fetchMinistries = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/ministries`)
+        if (!response.ok) {
+          const result = await response.json()
+          throw new Error(result.message || 'Unable to load ministries')
+        }
+
+        const ministries = await response.json()
+        setMinistriesList(ministries.map((ministry) => ({ ...ministry, id: ministry._id })))
+      } catch (error) {
+        console.error('Failed to fetch ministries:', error)
+        setMessage(error.message)
+      }
+    }
+
+    fetchMinistries()
+
+    const fetchDepartments = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/departments`)
+        if (!response.ok) {
+          const result = await response.json()
+          throw new Error(result.message || 'Unable to load departments')
+        }
+
+        const departments = await response.json()
+        setDepartmentsList(departments)
+      } catch (error) {
+        console.error('Failed to fetch departments:', error)
+        setMessage(error.message)
+      }
+    }
+
+    fetchDepartments()
   }, [])
 
   const handleRegister = async (event) => {
@@ -60,7 +102,7 @@ function App() {
     const password = formData.password.trim()
 
     if (!name || !password) {
-      setMessage('Please enter both name and password.')
+      setMessage('Please enter both username and password.')
       return
     }
 
@@ -69,15 +111,13 @@ function App() {
       return
     }
 
-    const role = formData.role || 'Editor'
-
     try {
       const response = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, password, role }),
+        body: JSON.stringify({ name, password, ministries: formData.ministries }),
       })
 
       const result = await response.json()
@@ -87,8 +127,72 @@ function App() {
       }
 
       setRegisteredUsers((currentUsers) => [result, ...currentUsers])
-      setFormData({ name: '', password: '', role: 'Editor' })
-      setMessage(`User "${name}" registered successfully as ${role}.`)
+      setFormData({ name: '', password: '', ministries: [] })
+      setMessage(`User "${name}" registered successfully.`)
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+
+  const startEditingUser = (user) => {
+    setEditingUserId(user._id)
+    setUserEditForm({ name: user.name, password: '', ministries: user.ministries || [] })
+  }
+
+  const handleUpdateUser = async (event, user) => {
+    event.preventDefault()
+
+    const name = userEditForm.name.trim()
+    const password = userEditForm.password.trim()
+
+    if (!name) {
+      setMessage('Username cannot be empty.')
+      return
+    }
+
+    if (password === ADMIN_PASSWORD) {
+      setMessage('This password is reserved for the admin account.')
+      return
+    }
+
+    try {
+      const body = { name, ministries: userEditForm.ministries }
+      if (password) body.password = password
+
+      const response = await fetch(`${API_BASE_URL}/users/${user._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const result = await response.json()
+
+      if (!response.ok) throw new Error(result.message || 'User update failed')
+
+      setRegisteredUsers((currentUsers) =>
+        currentUsers.map((currentUser) => (currentUser._id === user._id ? result : currentUser)),
+      )
+      setEditingUserId(null)
+      setMessage(`User "${name}" updated successfully.`)
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+
+  const handleToggleUserBlock = async (user) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${user._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isBlocked: !user.isBlocked }),
+      })
+      const result = await response.json()
+
+      if (!response.ok) throw new Error(result.message || 'Unable to update user status')
+
+      setRegisteredUsers((currentUsers) =>
+        currentUsers.map((currentUser) => (currentUser._id === user._id ? result : currentUser)),
+      )
+      setMessage(`User "${user.name}" ${result.isBlocked ? 'blocked' : 'unblocked'}.`)
     } catch (error) {
       setMessage(error.message)
     }
@@ -243,26 +347,15 @@ function App() {
         <form className="register-form dedicated-form" onSubmit={handleRegister}>
           <div className="form-grid">
             <label>
-              <span>Full Name</span>
+              <span>Username</span>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                placeholder="Enter full name"
+                placeholder="Enter username"
               />
             </label>
 
-            <label>
-              <span>Role</span>
-              <select
-                value={formData.role}
-                onChange={(event) => setFormData({ ...formData, role: event.target.value })}
-              >
-                <option value="Editor">Editor</option>
-                <option value="Manager">Manager</option>
-                <option value="Viewer">Viewer</option>
-              </select>
-            </label>
           </div>
 
           <label>
@@ -274,6 +367,32 @@ function App() {
               placeholder="Enter password"
             />
           </label>
+
+          <fieldset className="ministry-picker">
+            <legend>Assign Ministries <small>(optional)</small></legend>
+            {ministriesList.length ? (
+              <div className="ministry-options">
+                {ministriesList.map((ministry) => (
+                  <label className="ministry-option" key={ministry.id}>
+                    <input
+                      type="checkbox"
+                      checked={formData.ministries.includes(ministry.name)}
+                      onChange={(event) => {
+                        const selectedMinistries = event.target.checked
+                          ? [...formData.ministries, ministry.name]
+                          : formData.ministries.filter((name) => name !== ministry.name)
+
+                        setFormData({ ...formData, ministries: selectedMinistries })
+                      }}
+                    />
+                    <span>{ministry.name}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-picker">Add a ministry first to assign it to this user.</p>
+            )}
+          </fieldset>
 
           <button type="submit" className="primary-btn full-width">
             Register user
@@ -289,18 +408,80 @@ function App() {
         <table>
           <thead>
             <tr>
-              <th>Name</th>
+              <th>Username</th>
               <th>Role</th>
+              <th>Ministries</th>
               <th>Password</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {registeredUsers.map((user) => (
-              <tr key={`${user.name}-${user.password}`}>
-                <td>{user.name}</td>
-                <td>{user.role || 'Editor'}</td>
-                <td>{user.password}</td>
-              </tr>
+              editingUserId === user._id ? (
+                <tr key={user._id || `${user.name}-${user.password}`}>
+                  <td colSpan="6">
+                    <form className="inline-user-form" onSubmit={(event) => handleUpdateUser(event, user)}>
+                      <input
+                        value={userEditForm.name}
+                        onChange={(event) => setUserEditForm({ ...userEditForm, name: event.target.value })}
+                        aria-label="Edit username"
+                      />
+                      <input
+                        type="password"
+                        value={userEditForm.password}
+                        onChange={(event) => setUserEditForm({ ...userEditForm, password: event.target.value })}
+                        placeholder="New password (optional)"
+                        aria-label="New password"
+                      />
+                      {ministriesList.length > 0 && (
+                        <div className="inline-ministry-options">
+                          {ministriesList.map((ministry) => (
+                            <label key={ministry.id}>
+                              <input
+                                type="checkbox"
+                                checked={userEditForm.ministries.includes(ministry.name)}
+                                onChange={(event) => {
+                                  const selectedMinistries = event.target.checked
+                                    ? [...userEditForm.ministries, ministry.name]
+                                    : userEditForm.ministries.filter((name) => name !== ministry.name)
+
+                                  setUserEditForm({ ...userEditForm, ministries: selectedMinistries })
+                                }}
+                              />
+                              {ministry.name}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <button type="submit" className="small-btn edit-btn">Save</button>
+                      <button type="button" className="small-btn cancel-btn" onClick={() => setEditingUserId(null)}>
+                        Cancel
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={user._id || `${user.name}-${user.password}`} className={user.isBlocked ? 'blocked-row' : ''}>
+                  <td>{user.name}</td>
+                  <td>{user.role || 'Editor'}</td>
+                  <td>{user.ministries?.length ? user.ministries.join(', ') : 'None assigned'}</td>
+                  <td>{user.password}</td>
+                  <td><span className={`user-status ${user.isBlocked ? 'blocked' : 'active'}`}>{user.isBlocked ? 'Blocked' : 'Active'}</span></td>
+                  <td className="action-cell">
+                    <button type="button" className="small-btn edit-btn" onClick={() => startEditingUser(user)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className={`small-btn ${user.isBlocked ? 'unblock-btn' : 'block-btn'}`}
+                      onClick={() => handleToggleUserBlock(user)}
+                    >
+                      {user.isBlocked ? 'Unblock' : 'Block'}
+                    </button>
+                  </td>
+                </tr>
+              )
             ))}
           </tbody>
         </table>
@@ -308,35 +489,41 @@ function App() {
     </>
   )
 
-  const handleMinisterSubmit = (event) => {
+  const handleMinisterSubmit = async (event) => {
     event.preventDefault()
 
     const name = ministerForm.name.trim()
-    const description = ministerForm.description.trim()
 
-    if (!name || !description) {
-      setMessage('Please enter both minister name and description.')
+    if (!name) {
+      setMessage('Please enter the minister name.')
       return
     }
 
-    const nextMinister = {
-      id: editingMinisterId || Date.now(),
-      name,
-      description,
-    }
+    try {
+      const endpoint = editingMinisterId
+        ? `${API_BASE_URL}/ministries/${editingMinisterId}`
+        : `${API_BASE_URL}/ministries`
+      const response = await fetch(endpoint, {
+        method: editingMinisterId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const result = await response.json()
 
-    if (editingMinisterId) {
+      if (!response.ok) throw new Error(result.message || 'Ministry save failed')
+
+      const savedMinistry = { ...result, id: result._id }
       setMinistriesList((current) =>
-        current.map((minister) => (minister.id === editingMinisterId ? nextMinister : minister)),
+        editingMinisterId
+          ? current.map((minister) => (minister.id === editingMinisterId ? savedMinistry : minister))
+          : [savedMinistry, ...current],
       )
-      setMessage(`Minister "${name}" updated successfully.`)
-    } else {
-      setMinistriesList((current) => [nextMinister, ...current])
-      setMessage(`Minister "${name}" added successfully.`)
+      setMessage(`Minister "${name}" ${editingMinisterId ? 'updated' : 'added'} successfully.`)
+      setMinisterForm({ name: '', description: '' })
+      setEditingMinisterId(null)
+    } catch (error) {
+      setMessage(error.message)
     }
-
-    setMinisterForm({ name: '', description: '' })
-    setEditingMinisterId(null)
   }
 
   const handleEditMinister = (minister) => {
@@ -345,9 +532,17 @@ function App() {
     setActiveView('add-minister')
   }
 
-  const handleDeleteMinister = (id) => {
-    setMinistriesList((current) => current.filter((minister) => minister.id !== id))
-    setMessage('Minister deleted successfully.')
+  const handleDeleteMinister = async (id) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ministries/${id}`, { method: 'DELETE' })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.message || 'Ministry delete failed')
+
+      setMinistriesList((current) => current.filter((minister) => minister.id !== id))
+      setMessage('Minister deleted successfully.')
+    } catch (error) {
+      setMessage(error.message)
+    }
   }
 
   const renderMinisterPage = () => (
@@ -381,16 +576,6 @@ function App() {
             />
           </label>
 
-          <label>
-            <span>Description</span>
-            <textarea
-              rows="4"
-              value={ministerForm.description}
-              onChange={(event) => setMinisterForm({ ...ministerForm, description: event.target.value })}
-              placeholder="Add ministry description"
-            />
-          </label>
-
           <button type="submit" className="primary-btn full-width">
             {editingMinisterId ? 'Update Minister' : 'Add Minister'}
           </button>
@@ -406,7 +591,6 @@ function App() {
           <thead>
             <tr>
               <th>Name</th>
-              <th>Description</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -415,7 +599,6 @@ function App() {
               ministriesList.map((minister) => (
                 <tr key={minister.id}>
                   <td>{minister.name}</td>
-                  <td>{minister.description}</td>
                   <td className="action-cell">
                     <button
                       type="button"
@@ -436,8 +619,209 @@ function App() {
               ))
             ) : (
               <tr>
-                <td colSpan="3">No ministers added yet.</td>
+                <td colSpan="2">No ministers added yet.</td>
               </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+    </>
+  )
+
+  const handleDepartmentSubmit = async (event) => {
+    event.preventDefault()
+
+    const names = editingDepartmentId
+      ? [departmentForm.name.trim()]
+      : departmentNames.map((name) => name.trim()).filter(Boolean)
+
+    if (!names.length || !departmentForm.ministryId) {
+      setMessage('Please enter at least one department name and select a ministry.')
+      return
+    }
+
+    try {
+      const savedDepartments = []
+
+      for (const name of names) {
+        const endpoint = editingDepartmentId
+          ? `${API_BASE_URL}/departments/${editingDepartmentId}`
+          : `${API_BASE_URL}/departments`
+        const response = await fetch(endpoint, {
+          method: editingDepartmentId ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, ministryId: departmentForm.ministryId }),
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.message || `Failed to save ${name}`)
+        savedDepartments.push(result)
+      }
+
+      setDepartmentsList((current) => editingDepartmentId
+        ? current.map((department) => (department._id === editingDepartmentId ? savedDepartments[0] : department))
+        : [...savedDepartments.reverse(), ...current])
+      setDepartmentForm({ name: '', ministryId: departmentForm.ministryId })
+      setDepartmentNames([''])
+      setEditingDepartmentId(null)
+      setMessage(`${savedDepartments.length} department${savedDepartments.length > 1 ? 's' : ''} ${editingDepartmentId ? 'updated' : 'added'} successfully.`)
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+
+  const handleEditDepartment = (department) => {
+    setEditingDepartmentId(department._id)
+    setDepartmentForm({ name: department.name, ministryId: department.ministry?._id || department.ministryId })
+    setDepartmentNames([department.name])
+    setActiveView('add-department')
+  }
+
+  const handleDeleteDepartment = async (id) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/departments/${id}`, { method: 'DELETE' })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.message || 'Department delete failed')
+
+      setDepartmentsList((current) => current.filter((department) => department._id !== id))
+      setMessage('Department deleted successfully.')
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+
+  const prepareAnotherDepartment = () => {
+    setEditingDepartmentId(null)
+    setDepartmentForm({ name: '', ministryId: departmentForm.ministryId })
+    setDepartmentNames((current) => [...current, ''])
+    setActiveView('add-department')
+    setMessage('Ready to add another department.')
+  }
+
+  const renderDepartmentPage = () => (
+    <>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow muted">Structure</p>
+          <h1>{editingDepartmentId ? 'Edit Department' : 'Add Department'}</h1>
+        </div>
+
+        <div className="header-actions">
+          <button className="ghost-btn" type="button" onClick={() => setActiveView('dashboard')}>
+            Back to dashboard
+          </button>
+        </div>
+      </header>
+
+      <section className="panel user-panel">
+        <div className="panel-header">
+          <h3>{editingDepartmentId ? 'Update department details' : 'Create a new department'}</h3>
+        </div>
+
+        <form className="register-form dedicated-form" onSubmit={handleDepartmentSubmit}>
+          <label>
+            <span>Step 1 · Select Ministry</span>
+            <select
+              value={departmentForm.ministryId}
+              disabled={!ministriesList.length}
+              onChange={(event) => setDepartmentForm({ ...departmentForm, ministryId: event.target.value })}
+            >
+              <option value="">Select a ministry</option>
+              {ministriesList.map((ministry) => (
+                <option key={ministry.id} value={ministry.id}>{ministry.name}</option>
+              ))}
+            </select>
+          </label>
+
+          {!ministriesList.length && (
+            <div className="form-notice">
+              <span>Add a ministry first before creating departments.</span>
+              <button type="button" className="link-btn" onClick={() => setActiveView('add-minister')}>
+                Add Ministry
+              </button>
+            </div>
+          )}
+
+          {editingDepartmentId ? (
+            <label>
+              <span>Step 2 · Department Name</span>
+              <input
+                type="text"
+                value={departmentForm.name}
+                disabled={!departmentForm.ministryId}
+                onChange={(event) => setDepartmentForm({ ...departmentForm, name: event.target.value })}
+                placeholder="e.g. Department of Education"
+              />
+            </label>
+          ) : (
+            <div className="department-input-list">
+              {departmentNames.map((name, index) => (
+                <div className="repeatable-department-row" key={`department-input-${index}`}>
+                  <label>
+                    <span>Step 2 · Department {index + 1}</span>
+                    <input
+                      type="text"
+                      value={name}
+                      disabled={!departmentForm.ministryId}
+                      onChange={(event) => setDepartmentNames((current) => current.map((item, itemIndex) => (
+                        itemIndex === index ? event.target.value : item
+                      )))}
+                      placeholder={departmentForm.ministryId ? 'e.g. Department of Education' : 'Select a ministry first'}
+                    />
+                  </label>
+                  {departmentNames.length > 1 && (
+                    <button
+                      type="button"
+                      className="remove-department-btn"
+                      aria-label={`Remove department ${index + 1}`}
+                      title="Remove department field"
+                      onClick={() => setDepartmentNames((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button type="submit" className="primary-btn full-width" disabled={!departmentForm.ministryId}>
+            {editingDepartmentId ? 'Update Department' : 'Add Department'}
+          </button>
+          {!editingDepartmentId && departmentForm.ministryId && (
+            <button type="button" className="ghost-btn full-width" onClick={prepareAnotherDepartment}>
+              Add Next Department
+            </button>
+          )}
+        </form>
+      </section>
+
+      <section className="panel table-panel">
+        <div className="panel-header">
+          <h3>
+            {departmentForm.ministryId
+              ? `Departments under ${ministriesList.find((ministry) => ministry.id === departmentForm.ministryId)?.name || 'selected ministry'}`
+              : 'Department List'}
+          </h3>
+        </div>
+
+        <table>
+          <thead>
+            <tr><th>Department</th><th>Ministry</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {departmentsList.filter((department) => !departmentForm.ministryId || department.ministry?._id === departmentForm.ministryId).length ? departmentsList
+              .filter((department) => !departmentForm.ministryId || department.ministry?._id === departmentForm.ministryId)
+              .map((department) => (
+              <tr key={department._id}>
+                <td>{department.name}</td>
+                <td>{department.ministry?.name || 'Unknown ministry'}</td>
+                <td className="action-cell">
+                  <button type="button" className="small-btn edit-btn" onClick={() => handleEditDepartment(department)}>Edit</button>
+                  <button type="button" className="small-btn delete-btn" onClick={() => handleDeleteDepartment(department._id)}>Delete</button>
+                </td>
+              </tr>
+            )) : (
+              <tr><td colSpan="3">No departments added yet.</td></tr>
             )}
           </tbody>
         </table>
@@ -478,6 +862,13 @@ function App() {
           >
             Add Minister
           </button>
+          <button
+            type="button"
+            className={`nav-item ${activeView === 'add-department' ? 'active' : ''}`}
+            onClick={() => setActiveView('add-department')}
+          >
+            Add Department
+          </button>
         </nav>
 
         <div className="mini-card">
@@ -491,6 +882,7 @@ function App() {
         {activeView === 'dashboard' && renderDashboard()}
         {activeView === 'create-user' && renderCreateUser()}
         {activeView === 'add-minister' && renderMinisterPage()}
+        {activeView === 'add-department' && renderDepartmentPage()}
       </main>
     </div>
   )
