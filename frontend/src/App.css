@@ -60,42 +60,22 @@
 }
 
 .nav-item {
+  width: 100%;
+  border: none;
+  text-align: left;
   text-decoration: none;
   color: #cbd5e1;
   background: transparent;
   padding: 12px 14px;
   border-radius: 10px;
   transition: 0.2s ease;
+  cursor: pointer;
 }
 
 .nav-item.active,
 .nav-item:hover {
   background: rgba(59, 130, 246, 0.18);
   color: #fff;
-}
-
-.extra-actions {
-  background: rgba(15, 23, 42, 0.28);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 16px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.extra-actions h3 {
-  margin: 0;
-  color: #f8fafc;
-  font-size: 0.9rem;
-}
-
-.extra-actions button {
-  background: rgba(59, 130, 246, 0.12);
-  color: #dbeafe;
-  border: 1px solid rgba(96, 165, 250, 0.4);
-  padding: 10px 12px;
-  text-align: left;
 }
 
 .register-form {
@@ -108,10 +88,8 @@
   gap: 12px;
 }
 
-.register-form h3,
-.user-list h4 {
-  margin: 0;
-  color: #f8fafc;
+.dedicated-form {
+  max-width: 560px;
 }
 
 .register-form label {
@@ -124,15 +102,25 @@
   letter-spacing: 0.06em;
 }
 
-.register-form input {
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.register-form input,
+.register-form select,
+.register-form textarea {
   background: rgba(15, 23, 42, 0.8);
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 10px;
   padding: 10px 12px;
   color: #f8fafc;
+  resize: vertical;
 }
 
-.register-form input::placeholder {
+.register-form input::placeholder,
+.register-form textarea::placeholder {
   color: #94a3b8;
 }
 
@@ -140,25 +128,31 @@
   width: 100%;
 }
 
-.user-list {
-  background: rgba(15, 23, 42, 0.28);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 14px;
-  padding: 12px 14px;
+.user-panel {
+  margin-bottom: 24px;
 }
 
-.user-list ul {
-  list-style: none;
-  padding: 0;
-  margin: 12px 0 0;
+.action-cell {
   display: flex;
-  flex-direction: column;
   gap: 8px;
+  align-items: center;
 }
 
-.user-list li {
-  color: #dbeafe;
-  font-size: 0.9rem;
+.small-btn {
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.edit-btn {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.delete-btn {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .mini-card {
