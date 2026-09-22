@@ -264,6 +264,24 @@ app.delete('/api/departments/:id', async (req, res) => {
   }
 });
 
+app.post('/api/auth/admin-login', (req, res) => {
+  const { password } = req.body;
+
+  if (!password || password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({
+      message: 'Invalid password.',
+    });
+  }
+
+  return res.json({
+    message: 'Admin login successful.',
+    user: {
+      name: 'Admin',
+      role: 'Admin',
+    },
+  });
+});
+
 const startServer = async () => {
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

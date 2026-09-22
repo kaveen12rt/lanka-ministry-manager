@@ -1,0 +1,40 @@
+* { box-sizing: border-box; }
+:root { font-family: "Avenir Next", "Segoe UI", Arial, sans-serif; color: #172b45; background: #eef3f7; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+.portal-shell { min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(135deg,#eef3f7 0%,#f8fafc 55%,#e7edf3 100%); }
+.gov-header { min-height: 96px; padding: 18px 7vw; display: flex; align-items: center; gap: 18px; background: #fff; border-bottom: 1px solid #d6dee7; box-shadow: 0 2px 12px rgba(20,45,70,.06); }
+.gov-header img { width: 62px; height: 62px; object-fit: contain; }
+.gov-header span { display:block; text-transform: uppercase; letter-spacing: .12em; font-size: 11px; font-weight: 700; color:#697789; }
+.gov-header h1 { margin: 5px 0 0; font-size: 20px; font-weight: 700; color:#123b6d; }
+.home-content { width:min(1050px,88%); margin: auto; padding: 70px 0; }
+.welcome { text-align:center; margin-bottom:38px; }
+.eyebrow { margin:0 0 9px; font-size:11px; letter-spacing:.14em; font-weight:800; color:#718096; }
+.welcome h2 { margin:0; font-size:42px; color:#123b6d; }
+.welcome p:not(.eyebrow) { color:#637083; margin:10px 0 0; }
+.role-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.role-card { text-align:left; display:grid; grid-template-columns:72px 1fr; grid-template-rows:1fr auto; gap:0 20px; padding:32px; min-height:235px; border:1px solid #d4dde6; border-radius:12px; background:#fff; color:#172b45; box-shadow:0 12px 30px rgba(24,50,75,.07); transition:.2s ease; }
+.role-card:hover { transform:translateY(-3px); border-color:#9fb3c8; box-shadow:0 18px 35px rgba(24,50,75,.12); }
+.role-symbol { grid-row:1 / span 2; width:60px; height:60px; display:grid; place-items:center; border-radius:8px; background:#123b6d; color:#fff; font-size:25px; font-weight:700; }
+.role-card span { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:#7a8797; font-weight:700; }
+.role-card h3 { margin:7px 0 8px; font-size:25px; color:#173e68; }
+.role-card p { margin:0; color:#647285; line-height:1.6; }
+.role-card strong { grid-column:2; margin-top:20px; color:#123b6d; font-size:14px; }
+.notice { margin-top:24px; padding:17px 20px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; border:1px solid #d7e0e8; background:#f8fafc; color:#657387; font-size:13px; }
+.notice strong { color:#42566d; }
+.login-area { width:min(520px,92%); margin:auto; padding:50px 0; }
+.back-link { border:0; background:transparent; color:#123b6d; padding:0; margin-bottom:18px; font-weight:700; }
+.login-card { background:#fff; border:1px solid #d5dee7; border-radius:12px; padding:38px; box-shadow:0 16px 40px rgba(20,45,70,.1); }
+.login-icon { width:50px; height:50px; display:grid; place-items:center; background:#123b6d; color:#fff; border-radius:7px; font-size:21px; font-weight:700; margin-bottom:22px; }
+.login-card h2 { margin:0; color:#123b6d; font-size:28px; }
+.login-description { color:#697789; margin:9px 0 25px; line-height:1.5; }
+.login-card label { display:block; font-size:13px; font-weight:700; margin:16px 0 7px; color:#35485e; }
+.login-card input { width:100%; padding:12px 13px; border:1px solid #c8d3df; border-radius:5px; outline:none; }
+.login-card input:focus { border-color:#123b6d; box-shadow:0 0 0 3px rgba(18,59,109,.08); }
+.login-button { width:100%; margin-top:23px; border:0; border-radius:5px; padding:12px; background:#123b6d; color:#fff; font-weight:700; }
+.login-button:disabled { opacity:.65; cursor:wait; }
+.login-card small { display:block; text-align:center; color:#8994a2; margin-top:18px; }
+.error-message { padding:11px 13px; border:1px solid #e6bcbc; background:#fff3f3; color:#a12626; border-radius:5px; font-size:13px; }
+footer { padding:18px; text-align:center; font-size:12px; color:#7a8795; border-top:1px solid #d9e1e8; background:#fff; }
+@media (max-width:760px) { .role-grid { grid-template-columns:1fr; } .home-content { padding:45px 0; } .welcome h2 { font-size:34px; } .gov-header { padding:16px 5%; } .gov-header h1 { font-size:17px; } }
