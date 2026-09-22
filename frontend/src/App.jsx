@@ -4,18 +4,7 @@ import './App.css'
 const ADMIN_PASSWORD = '0011'
 const API_BASE_URL = 'http://localhost:5001/api'
 
-const stats = [
-  { label: 'Ministries', value: '0', change: 'No data yet' },
-  { label: 'Institutions', value: '0', change: 'No data yet' },
-  { label: 'New Updates', value: '0', change: 'Waiting for entries' },
-  { label: 'Admin Users', value: '1', change: 'System ready' },
-]
-
-const quickActions = ['Add Ministry', 'Add Institution', 'Publish Update', 'Export CSV']
-
-const ministries = []
-
-const institutions = []
+const quickActions = ['Add Ministry', 'Add Department', 'Create User']
 
 function App() {
   const [activeView, setActiveView] = useState('dashboard')
@@ -26,21 +15,31 @@ function App() {
   const [departmentNames, setDepartmentNames] = useState([''])
   const [editingDepartmentId, setEditingDepartmentId] = useState(null)
   const [departmentsList, setDepartmentsList] = useState([])
+  const [userSearch, setUserSearch] = useState('')
+  const [userStatusFilter, setUserStatusFilter] = useState('all')
+  const [ministrySearch, setMinistrySearch] = useState('')
+  const [departmentSearch, setDepartmentSearch] = useState('')
+  const [departmentMinistryFilter, setDepartmentMinistryFilter] = useState('all')
 
   const [registeredUsers, setRegisteredUsers] = useState([
     { name: 'Admin', password: ADMIN_PASSWORD, role: 'Admin' },
     { name: 'Sample User 01', password: 'sample123', role: 'Editor' },
   ])
 
-  const [formData, setFormData] = useState({ name: '', password: '', ministries: [] })
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', ministries: [] })
   const [editingUserId, setEditingUserId] = useState(null)
-  const [userEditForm, setUserEditForm] = useState({ name: '', password: '', ministries: [] })
+  const [userEditForm, setUserEditForm] = useState({ name: '', email: '', password: '', ministries: [] })
   const [message, setMessage] = useState('Admin password is fixed as 0011 for this demo.')
   const [messageType, setMessageType] = useState('info')
 
   const setAdminMessage = (text, type = 'info') => {
     setMessage(text || 'Something went wrong.')
     setMessageType(type)
+  }
+
+  const clearAdminMessage = () => {
+    setMessage('')
+    setMessageType('info')
   }
 
   useEffect(() => {
@@ -105,10 +104,16 @@ function App() {
     event.preventDefault()
 
     const name = formData.name.trim()
+    const email = formData.email.trim().toLowerCase()
     const password = formData.password.trim()
 
-    if (!name || !password) {
-      setAdminMessage('Please enter both username and password.', 'error')
+    if (!name || !email || !password) {
+      setAdminMessage('Please enter username, email, and password.', 'error')
+      return
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setAdminMessage('Please enter a valid email address.', 'error')
       return
     }
 
@@ -123,7 +128,7 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, password, ministries: formData.ministries }),
+        body: JSON.stringify({ name, email, password, ministries: formData.ministries }),
       })
 
       const result = await response.json()
@@ -133,7 +138,7 @@ function App() {
       }
 
       setRegisteredUsers((currentUsers) => [result, ...currentUsers])
-      setFormData({ name: '', password: '', ministries: [] })
+      setFormData({ name: '', email: '', password: '', ministries: [] })
       setAdminMessage(`User "${name}" registered successfully.`, 'success')
     } catch (error) {
       setAdminMessage(error?.message || 'Registration failed', 'error')
@@ -142,13 +147,14 @@ function App() {
 
   const startEditingUser = (user) => {
     setEditingUserId(user._id)
-    setUserEditForm({ name: user.name, password: '', ministries: user.ministries || [] })
+    setUserEditForm({ name: user.name, email: user.email || '', password: '', ministries: user.ministries || [] })
   }
 
   const handleUpdateUser = async (event, user) => {
     event.preventDefault()
 
     const name = userEditForm.name.trim()
+    const email = userEditForm.email.trim().toLowerCase()
     const password = userEditForm.password.trim()
 
     if (!name) {
@@ -161,8 +167,13 @@ function App() {
       return
     }
 
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setAdminMessage('Please enter a valid email address.', 'error')
+      return
+    }
+
     try {
-      const body = { name, ministries: userEditForm.ministries }
+      const body = { name, email, ministries: userEditForm.ministries }
       if (password) body.password = password
 
       const response = await fetch(`${API_BASE_URL}/users/${user._id}`, {
@@ -221,7 +232,12 @@ function App() {
       </header>
 
       <section className="stats-grid">
-        {stats.map((item) => (
+        {[
+          { label: 'Ministries', value: ministriesList.length, change: 'Managed entries' },
+          { label: 'Departments', value: departmentsList.length, change: 'Across all ministries' },
+          { label: 'Registered Users', value: registeredUsers.length, change: 'Admin-managed accounts' },
+          { label: 'Blocked Users', value: registeredUsers.filter((user) => user.isBlocked).length, change: 'Access restricted' },
+        ].map((item) => (
           <article className="stat-card" key={item.label}>
             <p>{item.label}</p>
             <h3>{item.value}</h3>
@@ -238,8 +254,13 @@ function App() {
           </div>
 
           <div className="action-list">
-            {quickActions.map((action) => (
-              <button key={action} className="action-btn" type="button">
+            {quickActions.slice(0, 3).map((action) => (
+              <button
+                key={action}
+                className="action-btn"
+                type="button"
+                onClick={() => setActiveView(action === 'Add Ministry' ? 'add-minister' : action === 'Add Department' ? 'add-department' : 'create-user')}
+              >
                 {action}
               </button>
             ))}
@@ -249,12 +270,12 @@ function App() {
         <div className="panel spotlight">
           <div className="panel-header">
             <h3>New submissions</h3>
-            <span className="badge">0</span>
+            <span className="badge">{departmentsList.length}</span>
           </div>
           <ul className="spotlight-list">
             <li>
-              <strong>No new entries</strong>
-              <span>Waiting for data to be added.</span>
+              <strong>{departmentsList.length ? 'Directory structure is active' : 'No departments yet'}</strong>
+              <span>{departmentsList.length ? `${departmentsList.length} departments are linked to ministries.` : 'Add a department to build the directory.'}</span>
             </li>
           </ul>
         </div>
@@ -263,7 +284,7 @@ function App() {
       <section className="panel table-panel">
         <div className="panel-header">
           <h3>Ministry summary</h3>
-          <button className="link-btn" type="button">Manage</button>
+          <button className="link-btn" type="button" onClick={() => setActiveView('add-minister')}>Manage</button>
         </div>
 
         <table>
@@ -275,16 +296,19 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {ministries.length ? (
-              ministries.map((item) => (
-                <tr key={item.name}>
-                  <td>{item.name}</td>
-                  <td>{item.count}</td>
-                  <td>
-                    <span className={`status ${item.status.toLowerCase()}`}>{item.status}</span>
-                  </td>
-                </tr>
-              ))
+            {ministriesList.length ? (
+              ministriesList.map((ministry) => {
+                const departmentCount = departmentsList.filter((department) => department.ministry?._id === ministry.id).length
+                return (
+                  <tr key={ministry.id}>
+                    <td>{ministry.name}</td>
+                    <td>{departmentCount}</td>
+                    <td>
+                      <span className={`status ${departmentCount ? 'active' : 'pending'}`}>{departmentCount ? 'Active' : 'Empty'}</span>
+                    </td>
+                  </tr>
+                )
+              })
             ) : (
               <tr>
                 <td colSpan="3">No ministries added yet.</td>
@@ -294,43 +318,20 @@ function App() {
         </table>
       </section>
 
-      <section className="panel table-panel">
-        <div className="panel-header">
-          <h3>Recent institution updates</h3>
-          <button className="link-btn" type="button">View timeline</button>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Institution</th>
-              <th>Ministry</th>
-              <th>Type</th>
-              <th>Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {institutions.length ? (
-              institutions.map((item) => (
-                <tr key={item.name}>
-                  <td>{item.name}</td>
-                  <td>{item.ministry}</td>
-                  <td>{item.type}</td>
-                  <td>{item.updated}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4">No institution records available.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
     </>
   )
 
-  const renderCreateUser = () => (
+  const renderCreateUser = () => {
+    const filteredUsers = registeredUsers.filter((user) => {
+      const query = userSearch.trim().toLowerCase()
+      const matchesSearch = !query || user.name.toLowerCase().includes(query) || user.email?.toLowerCase().includes(query)
+      const matchesStatus = userStatusFilter === 'all'
+        || (userStatusFilter === 'blocked' && user.isBlocked)
+        || (userStatusFilter === 'active' && !user.isBlocked)
+      return matchesSearch && matchesStatus
+    })
+
+    return (
     <>
       <header className="topbar">
         <div>
@@ -359,6 +360,16 @@ function App() {
                 value={formData.name}
                 onChange={(event) => setFormData({ ...formData, name: event.target.value })}
                 placeholder="Enter username"
+              />
+            </label>
+
+            <label>
+              <span>Email</span>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+                placeholder="Enter email address"
               />
             </label>
 
@@ -411,10 +422,26 @@ function App() {
           <h3>Registered users</h3>
         </div>
 
+        <div className="search-toolbar">
+          <input
+            type="search"
+            value={userSearch}
+            onChange={(event) => setUserSearch(event.target.value)}
+            placeholder="Search username or email"
+            aria-label="Search registered users"
+          />
+          <select value={userStatusFilter} onChange={(event) => setUserStatusFilter(event.target.value)} aria-label="Filter users by status">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="blocked">Blocked</option>
+          </select>
+        </div>
+
         <table>
           <thead>
             <tr>
               <th>Username</th>
+              <th>Email</th>
               <th>Role</th>
               <th>Ministries</th>
               <th>Password</th>
@@ -423,77 +450,105 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {registeredUsers.map((user) => (
-              editingUserId === user._id ? (
-                <tr key={user._id || `${user.name}-${user.password}`}>
-                  <td colSpan="6">
-                    <form className="inline-user-form" onSubmit={(event) => handleUpdateUser(event, user)}>
-                      <input
-                        value={userEditForm.name}
-                        onChange={(event) => setUserEditForm({ ...userEditForm, name: event.target.value })}
-                        aria-label="Edit username"
-                      />
-                      <input
-                        type="password"
-                        value={userEditForm.password}
-                        onChange={(event) => setUserEditForm({ ...userEditForm, password: event.target.value })}
-                        placeholder="New password (optional)"
-                        aria-label="New password"
-                      />
-                      {ministriesList.length > 0 && (
-                        <div className="inline-ministry-options">
-                          {ministriesList.map((ministry) => (
-                            <label key={ministry.id}>
-                              <input
-                                type="checkbox"
-                                checked={userEditForm.ministries.includes(ministry.name)}
-                                onChange={(event) => {
-                                  const selectedMinistries = event.target.checked
-                                    ? [...userEditForm.ministries, ministry.name]
-                                    : userEditForm.ministries.filter((name) => name !== ministry.name)
-
-                                  setUserEditForm({ ...userEditForm, ministries: selectedMinistries })
-                                }}
-                              />
-                              {ministry.name}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                      <button type="submit" className="small-btn edit-btn">Save</button>
-                      <button type="button" className="small-btn cancel-btn" onClick={() => setEditingUserId(null)}>
-                        Cancel
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={user._id || `${user.name}-${user.password}`} className={user.isBlocked ? 'blocked-row' : ''}>
-                  <td>{user.name}</td>
-                  <td>{user.role || 'Editor'}</td>
-                  <td>{user.ministries?.length ? user.ministries.join(', ') : 'None assigned'}</td>
-                  <td>{user.password}</td>
-                  <td><span className={`user-status ${user.isBlocked ? 'blocked' : 'active'}`}>{user.isBlocked ? 'Blocked' : 'Active'}</span></td>
-                  <td className="action-cell">
-                    <button type="button" className="small-btn edit-btn" onClick={() => startEditingUser(user)}>
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={`small-btn ${user.isBlocked ? 'unblock-btn' : 'block-btn'}`}
-                      onClick={() => handleToggleUserBlock(user)}
-                    >
-                      {user.isBlocked ? 'Unblock' : 'Block'}
-                    </button>
-                  </td>
-                </tr>
-              )
+            {filteredUsers.map((user) => (
+              <tr key={user._id || `${user.name}-${user.password}`} className={user.isBlocked ? 'blocked-row' : ''}>
+                <td>{user.name}</td>
+                <td>{user.email || 'Not provided'}</td>
+                <td>{user.role || 'Editor'}</td>
+                <td>{user.ministries?.length ? user.ministries.join(', ') : 'None assigned'}</td>
+                <td>{user.password}</td>
+                <td><span className={`user-status ${user.isBlocked ? 'blocked' : 'active'}`}>{user.isBlocked ? 'Blocked' : 'Active'}</span></td>
+                <td className="action-cell">
+                  <button type="button" className="small-btn edit-btn" onClick={() => startEditingUser(user)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className={`small-btn ${user.isBlocked ? 'unblock-btn' : 'block-btn'}`}
+                    onClick={() => handleToggleUserBlock(user)}
+                  >
+                    {user.isBlocked ? 'Unblock' : 'Block'}
+                  </button>
+                </td>
+              </tr>
             ))}
           </tbody>
         </table>
       </section>
+
+      {editingUserId && (
+        <div className="user-edit-overlay" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setEditingUserId(null)
+        }}>
+          <section className="user-edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-user-title">
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow muted">Registered users</p>
+                <h2 id="edit-user-title">Edit User</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setEditingUserId(null)} aria-label="Close edit user page">
+                ×
+              </button>
+            </div>
+
+            <form className="modal-form" onSubmit={(event) => handleUpdateUser(event, registeredUsers.find((user) => user._id === editingUserId))}>
+              <label>
+                <span>Username</span>
+                <input
+                  value={userEditForm.name}
+                  onChange={(event) => setUserEditForm({ ...userEditForm, name: event.target.value })}
+                />
+              </label>
+              <label>
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={userEditForm.email}
+                  onChange={(event) => setUserEditForm({ ...userEditForm, email: event.target.value })}
+                />
+              </label>
+              <label>
+                <span>New Password <small>(optional)</small></span>
+                <input
+                  type="password"
+                  value={userEditForm.password}
+                  onChange={(event) => setUserEditForm({ ...userEditForm, password: event.target.value })}
+                  placeholder="Leave blank to keep current password"
+                />
+              </label>
+              <fieldset className="ministry-picker">
+                <legend>Assign Ministries <small>(optional)</small></legend>
+                {ministriesList.length ? (
+                  <div className="ministry-options">
+                    {ministriesList.map((ministry) => (
+                      <label className="ministry-option" key={ministry.id}>
+                        <input
+                          type="checkbox"
+                          checked={userEditForm.ministries.includes(ministry.name)}
+                          onChange={(event) => {
+                            const selectedMinistries = event.target.checked
+                              ? [...userEditForm.ministries, ministry.name]
+                              : userEditForm.ministries.filter((name) => name !== ministry.name)
+                            setUserEditForm({ ...userEditForm, ministries: selectedMinistries })
+                          }}
+                        />
+                        <span>{ministry.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : <p className="empty-picker">No ministries available.</p>}
+              </fieldset>
+              <div className="modal-actions">
+                <button type="button" className="ghost-btn" onClick={() => setEditingUserId(null)}>Cancel</button>
+                <button type="submit" className="primary-btn">Save Changes</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </>
-  )
+    )
+  }
 
   const handleMinisterSubmit = async (event) => {
     event.preventDefault()
@@ -535,10 +590,13 @@ function App() {
   const handleEditMinister = (minister) => {
     setEditingMinisterId(minister.id)
     setMinisterForm({ name: minister.name, description: minister.description })
-    setActiveView('add-minister')
   }
 
   const handleDeleteMinister = async (id) => {
+    const ministry = ministriesList.find((item) => item.id === id)
+    const shouldDelete = window.confirm(`Delete ministry "${ministry?.name || 'this ministry'}"?`)
+    if (!shouldDelete) return
+
     try {
       const response = await fetch(`${API_BASE_URL}/ministries/${id}`, { method: 'DELETE' })
       const result = await response.json()
@@ -551,7 +609,12 @@ function App() {
     }
   }
 
-  const renderMinisterPage = () => (
+  const renderMinisterPage = () => {
+    const filteredMinistries = ministriesList.filter((minister) =>
+      minister.name.toLowerCase().includes(ministrySearch.trim().toLowerCase()),
+    )
+
+    return (
     <>
       <header className="topbar">
         <div>
@@ -593,6 +656,16 @@ function App() {
           <h3>Minister List</h3>
         </div>
 
+        <div className="search-toolbar">
+          <input
+            type="search"
+            value={ministrySearch}
+            onChange={(event) => setMinistrySearch(event.target.value)}
+            placeholder="Search ministries"
+            aria-label="Search ministries"
+          />
+        </div>
+
         <table>
           <thead>
             <tr>
@@ -601,8 +674,8 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {ministriesList.length ? (
-              ministriesList.map((minister) => (
+            {filteredMinistries.length ? (
+              filteredMinistries.map((minister) => (
                 <tr key={minister.id}>
                   <td>{minister.name}</td>
                   <td className="action-cell">
@@ -631,8 +704,39 @@ function App() {
           </tbody>
         </table>
       </section>
+
+      {editingMinisterId && (
+        <div className="user-edit-overlay" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setEditingMinisterId(null)
+        }}>
+          <section className="user-edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-ministry-title">
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow muted">Ministry management</p>
+                <h2 id="edit-ministry-title">Edit Ministry</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setEditingMinisterId(null)} aria-label="Close edit ministry form">×</button>
+            </div>
+            <form className="modal-form" onSubmit={handleMinisterSubmit}>
+              <label>
+                <span>Ministry Name</span>
+                <input
+                  value={ministerForm.name}
+                  onChange={(event) => setMinisterForm({ ...ministerForm, name: event.target.value })}
+                  autoFocus
+                />
+              </label>
+              <div className="modal-actions">
+                <button type="button" className="ghost-btn" onClick={() => setEditingMinisterId(null)}>Cancel</button>
+                <button type="submit" className="primary-btn">Save Changes</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </>
-  )
+    )
+  }
 
   const handleDepartmentSubmit = async (event) => {
     event.preventDefault()
@@ -679,10 +783,13 @@ function App() {
     setEditingDepartmentId(department._id)
     setDepartmentForm({ name: department.name, ministryId: department.ministry?._id || department.ministryId })
     setDepartmentNames([department.name])
-    setActiveView('add-department')
   }
 
   const handleDeleteDepartment = async (id) => {
+    const department = departmentsList.find((item) => item._id === id)
+    const shouldDelete = window.confirm(`Delete department "${department?.name || 'this department'}"?`)
+    if (!shouldDelete) return
+
     try {
       const response = await fetch(`${API_BASE_URL}/departments/${id}`, { method: 'DELETE' })
       const result = await response.json()
@@ -703,7 +810,15 @@ function App() {
     setAdminMessage('Ready to add another department.', 'info')
   }
 
-  const renderDepartmentPage = () => (
+  const renderDepartmentPage = () => {
+    const filteredDepartments = departmentsList.filter((department) => {
+      const query = departmentSearch.trim().toLowerCase()
+      const matchesSearch = !query || department.name.toLowerCase().includes(query)
+      const matchesMinistry = departmentMinistryFilter === 'all' || department.ministry?._id === departmentMinistryFilter
+      return matchesSearch && matchesMinistry
+    })
+
+    return (
     <>
       <header className="topbar">
         <div>
@@ -811,14 +926,28 @@ function App() {
           </h3>
         </div>
 
+        <div className="search-toolbar">
+          <input
+            type="search"
+            value={departmentSearch}
+            onChange={(event) => setDepartmentSearch(event.target.value)}
+            placeholder="Search departments"
+            aria-label="Search departments"
+          />
+          <select value={departmentMinistryFilter} onChange={(event) => setDepartmentMinistryFilter(event.target.value)} aria-label="Filter departments by ministry">
+            <option value="all">All ministries</option>
+            {ministriesList.map((ministry) => (
+              <option key={ministry.id} value={ministry.id}>{ministry.name}</option>
+            ))}
+          </select>
+        </div>
+
         <table>
           <thead>
             <tr><th>Department</th><th>Ministry</th><th>Actions</th></tr>
           </thead>
           <tbody>
-            {departmentsList.filter((department) => !departmentForm.ministryId || department.ministry?._id === departmentForm.ministryId).length ? departmentsList
-              .filter((department) => !departmentForm.ministryId || department.ministry?._id === departmentForm.ministryId)
-              .map((department) => (
+            {filteredDepartments.length ? filteredDepartments.map((department) => (
               <tr key={department._id}>
                 <td>{department.name}</td>
                 <td>{department.ministry?.name || 'Unknown ministry'}</td>
@@ -833,8 +962,51 @@ function App() {
           </tbody>
         </table>
       </section>
+
+      {editingDepartmentId && (
+        <div className="user-edit-overlay" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setEditingDepartmentId(null)
+        }}>
+          <section className="user-edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-department-title">
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow muted">Department management</p>
+                <h2 id="edit-department-title">Edit Department</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setEditingDepartmentId(null)} aria-label="Close edit department form">×</button>
+            </div>
+            <form className="modal-form" onSubmit={handleDepartmentSubmit}>
+              <label>
+                <span>Department Name</span>
+                <input
+                  value={departmentForm.name}
+                  onChange={(event) => setDepartmentForm({ ...departmentForm, name: event.target.value })}
+                  autoFocus
+                />
+              </label>
+              <label>
+                <span>Parent Ministry</span>
+                <select
+                  value={departmentForm.ministryId}
+                  onChange={(event) => setDepartmentForm({ ...departmentForm, ministryId: event.target.value })}
+                >
+                  <option value="">Select a ministry</option>
+                  {ministriesList.map((ministry) => (
+                    <option key={ministry.id} value={ministry.id}>{ministry.name}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="modal-actions">
+                <button type="button" className="ghost-btn" onClick={() => setEditingDepartmentId(null)}>Cancel</button>
+                <button type="submit" className="primary-btn">Save Changes</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </>
-  )
+    )
+  }
 
   return (
     <div className="admin-shell">
@@ -886,6 +1058,17 @@ function App() {
       </aside>
 
       <main className="main-panel">
+        {message && messageType === 'error' && (
+          <div className="admin-alert error-alert" role="alert">
+            <div className="alert-content">
+              <strong>Form error</strong>
+              <span>{message}</span>
+            </div>
+            <button type="button" className="alert-close" onClick={clearAdminMessage} aria-label="Close error alert">
+              ×
+            </button>
+          </div>
+        )}
         {activeView === 'dashboard' && renderDashboard()}
         {activeView === 'create-user' && renderCreateUser()}
         {activeView === 'add-minister' && renderMinisterPage()}
