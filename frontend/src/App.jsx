@@ -36,6 +36,12 @@ function App() {
   const [editingUserId, setEditingUserId] = useState(null)
   const [userEditForm, setUserEditForm] = useState({ name: '', password: '', ministries: [] })
   const [message, setMessage] = useState('Admin password is fixed as 0011 for this demo.')
+  const [messageType, setMessageType] = useState('info')
+
+  const setAdminMessage = (text, type = 'info') => {
+    setMessage(text || 'Something went wrong.')
+    setMessageType(type)
+  }
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -52,7 +58,7 @@ function App() {
         }
       } catch (error) {
         console.error('Failed to fetch users:', error)
-        setMessage(error.message)
+        setAdminMessage(error?.message || 'Unable to load users', 'error')
       }
     }
 
@@ -70,7 +76,7 @@ function App() {
         setMinistriesList(ministries.map((ministry) => ({ ...ministry, id: ministry._id })))
       } catch (error) {
         console.error('Failed to fetch ministries:', error)
-        setMessage(error.message)
+        setAdminMessage(error?.message || 'Unable to load ministries', 'error')
       }
     }
 
@@ -88,7 +94,7 @@ function App() {
         setDepartmentsList(departments)
       } catch (error) {
         console.error('Failed to fetch departments:', error)
-        setMessage(error.message)
+        setAdminMessage(error?.message || 'Unable to load departments', 'error')
       }
     }
 
@@ -102,12 +108,12 @@ function App() {
     const password = formData.password.trim()
 
     if (!name || !password) {
-      setMessage('Please enter both username and password.')
+      setAdminMessage('Please enter both username and password.', 'error')
       return
     }
 
     if (password === ADMIN_PASSWORD) {
-      setMessage('This password is reserved for the admin account. Please choose another password for a new user.')
+      setAdminMessage('This password is reserved for the admin account. Please choose another password for a new user.', 'error')
       return
     }
 
@@ -128,9 +134,9 @@ function App() {
 
       setRegisteredUsers((currentUsers) => [result, ...currentUsers])
       setFormData({ name: '', password: '', ministries: [] })
-      setMessage(`User "${name}" registered successfully.`)
+      setAdminMessage(`User "${name}" registered successfully.`, 'success')
     } catch (error) {
-      setMessage(error.message)
+      setAdminMessage(error?.message || 'Registration failed', 'error')
     }
   }
 
@@ -146,12 +152,12 @@ function App() {
     const password = userEditForm.password.trim()
 
     if (!name) {
-      setMessage('Username cannot be empty.')
+      setAdminMessage('Username cannot be empty.', 'error')
       return
     }
 
     if (password === ADMIN_PASSWORD) {
-      setMessage('This password is reserved for the admin account.')
+      setAdminMessage('This password is reserved for the admin account.', 'error')
       return
     }
 
@@ -172,9 +178,9 @@ function App() {
         currentUsers.map((currentUser) => (currentUser._id === user._id ? result : currentUser)),
       )
       setEditingUserId(null)
-      setMessage(`User "${name}" updated successfully.`)
+      setAdminMessage(`User "${name}" updated successfully.`, 'success')
     } catch (error) {
-      setMessage(error.message)
+      setAdminMessage(error?.message || 'User update failed', 'error')
     }
   }
 
@@ -192,9 +198,9 @@ function App() {
       setRegisteredUsers((currentUsers) =>
         currentUsers.map((currentUser) => (currentUser._id === user._id ? result : currentUser)),
       )
-      setMessage(`User "${user.name}" ${result.isBlocked ? 'blocked' : 'unblocked'}.`)
+      setAdminMessage(`User "${user.name}" ${result.isBlocked ? 'blocked' : 'unblocked'}.`, 'success')
     } catch (error) {
-      setMessage(error.message)
+      setAdminMessage(error?.message || 'Unable to update user status', 'error')
     }
   }
 
@@ -495,7 +501,7 @@ function App() {
     const name = ministerForm.name.trim()
 
     if (!name) {
-      setMessage('Please enter the minister name.')
+      setAdminMessage('Please enter the minister name.', 'error')
       return
     }
 
@@ -518,11 +524,11 @@ function App() {
           ? current.map((minister) => (minister.id === editingMinisterId ? savedMinistry : minister))
           : [savedMinistry, ...current],
       )
-      setMessage(`Minister "${name}" ${editingMinisterId ? 'updated' : 'added'} successfully.`)
+      setAdminMessage(`Minister "${name}" ${editingMinisterId ? 'updated' : 'added'} successfully.`, 'success')
       setMinisterForm({ name: '', description: '' })
       setEditingMinisterId(null)
     } catch (error) {
-      setMessage(error.message)
+      setAdminMessage(error?.message || 'Ministry save failed', 'error')
     }
   }
 
@@ -539,9 +545,9 @@ function App() {
       if (!response.ok) throw new Error(result.message || 'Ministry delete failed')
 
       setMinistriesList((current) => current.filter((minister) => minister.id !== id))
-      setMessage('Minister deleted successfully.')
+      setAdminMessage('Minister deleted successfully.', 'success')
     } catch (error) {
-      setMessage(error.message)
+      setAdminMessage(error?.message || 'Ministry delete failed', 'error')
     }
   }
 
@@ -636,7 +642,7 @@ function App() {
       : departmentNames.map((name) => name.trim()).filter(Boolean)
 
     if (!names.length || !departmentForm.ministryId) {
-      setMessage('Please enter at least one department name and select a ministry.')
+      setAdminMessage('Please enter at least one department name and select a ministry.', 'error')
       return
     }
 
@@ -663,9 +669,9 @@ function App() {
       setDepartmentForm({ name: '', ministryId: departmentForm.ministryId })
       setDepartmentNames([''])
       setEditingDepartmentId(null)
-      setMessage(`${savedDepartments.length} department${savedDepartments.length > 1 ? 's' : ''} ${editingDepartmentId ? 'updated' : 'added'} successfully.`)
+      setAdminMessage(`${savedDepartments.length} department${savedDepartments.length > 1 ? 's' : ''} ${editingDepartmentId ? 'updated' : 'added'} successfully.`, 'success')
     } catch (error) {
-      setMessage(error.message)
+      setAdminMessage(error?.message || 'Department save failed', 'error')
     }
   }
 
@@ -683,9 +689,9 @@ function App() {
       if (!response.ok) throw new Error(result.message || 'Department delete failed')
 
       setDepartmentsList((current) => current.filter((department) => department._id !== id))
-      setMessage('Department deleted successfully.')
+      setAdminMessage('Department deleted successfully.', 'success')
     } catch (error) {
-      setMessage(error.message)
+      setAdminMessage(error?.message || 'Department delete failed', 'error')
     }
   }
 
@@ -694,7 +700,7 @@ function App() {
     setDepartmentForm({ name: '', ministryId: departmentForm.ministryId })
     setDepartmentNames((current) => [...current, ''])
     setActiveView('add-department')
-    setMessage('Ready to add another department.')
+    setAdminMessage('Ready to add another department.', 'info')
   }
 
   const renderDepartmentPage = () => (
@@ -784,14 +790,15 @@ function App() {
             </div>
           )}
 
-          <button type="submit" className="primary-btn full-width" disabled={!departmentForm.ministryId}>
-            {editingDepartmentId ? 'Update Department' : 'Add Department'}
-          </button>
           {!editingDepartmentId && departmentForm.ministryId && (
             <button type="button" className="ghost-btn full-width" onClick={prepareAnotherDepartment}>
               Add Next Department
             </button>
           )}
+
+          <button type="submit" className="primary-btn full-width" disabled={!departmentForm.ministryId}>
+            {editingDepartmentId ? 'Update Department' : 'Add Department'}
+          </button>
         </form>
       </section>
 
@@ -871,7 +878,7 @@ function App() {
           </button>
         </nav>
 
-        <div className="mini-card">
+        <div className={`mini-card ${messageType === 'error' ? 'is-error' : messageType === 'success' ? 'is-success' : ''}`}>
           <span className="mini-label">Admin</span>
           <strong>Password: {ADMIN_PASSWORD}</strong>
           <small>{message}</small>
