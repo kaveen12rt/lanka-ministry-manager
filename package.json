@@ -4,6 +4,9 @@
   "description": "A full-stack web application (MERN) to manage and browse the directory of Sri Lankan Government Ministries, Departments, and Public Corporations.",
   "main": "index.js",
   "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
