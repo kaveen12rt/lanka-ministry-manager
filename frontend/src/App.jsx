@@ -89,6 +89,13 @@ function App() {
           <a className="nav-item" href="#">Settings</a>
         </nav>
 
+        <div className="extra-actions">
+          <h3>Other actions</h3>
+          <button type="button">Add user</button>
+          <button type="button">Audit log</button>
+          <button type="button">Backup</button>
+        </div>
+
         <form className="register-form" onSubmit={handleRegister}>
           <h3>Create user</h3>
 
