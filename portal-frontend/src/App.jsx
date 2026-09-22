@@ -18,6 +18,10 @@ function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // ======================================================
+  // LOGIN
+  // ======================================================
+
   const handleLogin = async (event) => {
     event.preventDefault();
 
@@ -33,29 +37,22 @@ function App() {
       return;
     }
 
-    try {
-      /*
-       * ==================================================
-       * ADMIN LOGIN
-       * ==================================================
-       *
-       * Admin does not need a username/email.
-       *
-       * Leave the username/email field empty and
-       * enter the admin password.
-       */
+    const isAdminLogin = !identifier;
+    const targetPort = isAdminLogin ? 5001 : 5002;
+    const targetName = isAdminLogin ? "Admin" : "Ministry";
 
-      if (!identifier) {
+    try {
+      // ==================================================
+      // ADMIN LOGIN (no username provided)
+      // ==================================================
+
+      if (isAdminLogin) {
         const adminResponse = await fetch(
           `${ADMIN_API}/auth/admin-login`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              password,
-            }),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password }),
           }
         );
 
@@ -63,89 +60,83 @@ function App() {
 
         if (!adminResponse.ok) {
           throw new Error(
-            adminData.message ||
-              "Invalid administrator password."
+            adminData.message || "Invalid administrator password."
           );
         }
 
-        sessionStorage.setItem(
-          "adminAuthenticated",
-          "true"
-        );
-
+        sessionStorage.setItem("adminAuthenticated", "true");
         sessionStorage.setItem(
           "adminUser",
-          JSON.stringify({
-            name: "Admin",
-            role: "Admin",
-          })
+          JSON.stringify({ name: "Admin", role: "Admin" })
         );
 
         window.location.href = ADMIN_PORTAL;
         return;
       }
 
-      /*
-       * ==================================================
-       * MINISTRY USER LOGIN
-       * ==================================================
-       *
-       * Ministry users must provide username/email
-       * and password.
-       */
+      // ==================================================
+      // MINISTRY USER LOGIN (username/email provided)
+      // ==================================================
 
       const ministryResponse = await fetch(
         `${MINISTRY_API}/auth/login`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            identifier,
-            password,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier, password }),
         }
       );
 
-      const ministryData =
-        await ministryResponse.json();
+      let ministryData = {};
+      try {
+        ministryData = await ministryResponse.json();
+      } catch {
+        ministryData = {};
+      }
 
       if (!ministryResponse.ok) {
         throw new Error(
           ministryData.message ||
-            "Invalid username/email or password."
+            `Login failed (${ministryResponse.status}).`
         );
       }
 
-      /*
-       * Save Ministry User authentication
-       */
-      localStorage.setItem(
-        "token",
-        ministryData.token
-      );
+      if (!ministryData.token) {
+        throw new Error(
+          "Login succeeded, but no authentication token was returned."
+        );
+      }
 
+      localStorage.setItem("token", ministryData.token);
       localStorage.setItem(
         "user",
         JSON.stringify(ministryData.user)
       );
 
-      /*
-       * Go to Ministry User Portal
-       */
       window.location.href = MINISTRY_PORTAL;
-    } catch (error) {
-      console.error("Login error:", error);
+    } catch (err) {
+      console.error("Login error:", err);
 
-      setError(
-        error.message ||
-          "Unable to connect to the server."
-      );
+      if (
+        err instanceof TypeError &&
+        err.message === "Failed to fetch"
+      ) {
+        // Network error — but on which backend?
+        setError(
+          `Unable to connect to the ${targetName} backend. ` +
+            `Make sure the server is running on port ${targetPort}.`
+        );
+      } else {
+        setError(err.message || "Unable to connect to the server.");
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // ======================================================
+  // NAVIGATION
+  // ======================================================
 
   const goToLogin = () => {
     setShowLogin(true);
@@ -154,36 +145,22 @@ function App() {
 
   const goToHome = () => {
     setShowLogin(false);
-
-    setCredentials({
-      identifier: "",
-      password: "",
-    });
-
+    setCredentials({ identifier: "", password: "" });
     setError("");
   };
 
-  /*
-   * ======================================================
-   * LOGIN PAGE
-   * ======================================================
-   */
+  // ======================================================
+  // LOGIN PAGE
+  // ======================================================
 
   if (showLogin) {
     return (
       <div className="portal-shell">
         <header className="gov-header">
-          <img
-            src="/gov-logo.jpg"
-            alt="Government of Sri Lanka"
-          />
-
+          <img src="/gov-logo.jpg" alt="Government of Sri Lanka" />
           <div>
             <span>Government of Sri Lanka</span>
-
-            <h1>
-              Ministry & Department Management System
-            </h1>
+            <h1>Ministry &amp; Department Management System</h1>
           </div>
         </header>
 
@@ -197,58 +174,43 @@ function App() {
           </button>
 
           <section className="login-card">
-            <div className="login-icon">
-              SL
-            </div>
-
-            <p className="eyebrow">
-              SYSTEM ACCESS
-            </p>
-
+            <div className="login-icon">SL</div>
+            <p className="eyebrow">SYSTEM ACCESS</p>
             <h2>Sign In</h2>
-
             <p className="login-description">
-              Enter your authorized username or email
-              address and password to continue.
+              Enter your authorized username or email address and
+              password to continue.
             </p>
 
-            {error && (
-              <div className="error-message">
-                {error}
-              </div>
-            )}
+            {error && <div className="error-message">{error}</div>}
 
             <form onSubmit={handleLogin}>
               <label htmlFor="identifier">
                 Username or Email Address
               </label>
-
               <input
                 id="identifier"
                 type="text"
                 value={credentials.identifier}
-                onChange={(event) =>
+                onChange={(e) =>
                   setCredentials({
                     ...credentials,
-                    identifier: event.target.value,
+                    identifier: e.target.value,
                   })
                 }
-                placeholder="Username or email (leave blank for Admin)"
+                placeholder="Username or email"
                 autoComplete="username"
               />
 
-              <label htmlFor="password">
-                Password
-              </label>
-
+              <label htmlFor="password">Password</label>
               <input
                 id="password"
                 type="password"
                 value={credentials.password}
-                onChange={(event) =>
+                onChange={(e) =>
                   setCredentials({
                     ...credentials,
-                    password: event.target.value,
+                    password: e.target.value,
                   })
                 }
                 placeholder="Enter your password"
@@ -261,63 +223,44 @@ function App() {
                 className="login-button"
                 disabled={loading}
               >
-                {loading
-                  ? "Signing in..."
-                  : "Sign In"}
+                {loading ? "Signing in..." : "Sign In"}
               </button>
             </form>
 
-            <small>
-              Authorized Government users only
-            </small>
+            <small>Authorized Government users only</small>
           </section>
         </main>
 
         <footer>
-          © Government of Sri Lanka • Ministry &
-          Department Management System
+          © Government of Sri Lanka • Ministry &amp; Department
+          Management System
         </footer>
       </div>
     );
   }
 
-  /*
-   * ======================================================
-   * HOME PAGE
-   * ======================================================
-   */
+  // ======================================================
+  // HOME PAGE
+  // ======================================================
 
   return (
     <div className="portal-shell home">
       <header className="gov-header">
-        <img
-          src="/gov-logo.jpg"
-          alt="Government of Sri Lanka"
-        />
-
+        <img src="/gov-logo.jpg" alt="Government of Sri Lanka" />
         <div>
           <span>Government of Sri Lanka</span>
-
-          <h1>
-            Ministry & Department Management System
-          </h1>
+          <h1>Ministry &amp; Department Management System</h1>
         </div>
       </header>
 
       <main className="home-content">
         <div className="welcome">
-          <p className="eyebrow">
-            OFFICIAL GOVERNMENT PORTAL
-          </p>
-
+          <p className="eyebrow">OFFICIAL GOVERNMENT PORTAL</p>
           <h2>Welcome</h2>
-
           <p>
-            Access the Ministry & Department
-            Management System using your
-            authorized credentials.
+            Access the Ministry &amp; Department Management System
+            using your authorized credentials.
           </p>
-
           <button
             type="button"
             className="login-button home-login-button"
@@ -329,17 +272,16 @@ function App() {
 
         <div className="notice">
           <strong>Access Notice</strong>
-
           <span>
-            This system is intended for authorized
-            Government of Sri Lanka users only.
+            This system is intended for authorized Government of Sri
+            Lanka users only.
           </span>
         </div>
       </main>
 
       <footer>
-        © Government of Sri Lanka • Ministry &
-        Department Management System
+        © Government of Sri Lanka • Ministry &amp; Department
+        Management System
       </footer>
     </div>
   );

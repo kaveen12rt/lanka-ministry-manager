@@ -1,1134 +1,684 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./App.css";
 
 const API_URL = "http://localhost:5002/api";
-
-const COMMON_PORTAL =
-  "http://localhost:5175/";
+const COMMON_PORTAL = "http://localhost:5177/";
 
 const api = axios.create({
   baseURL: API_URL,
+  headers: { "Content-Type": "application/json" },
 });
 
-/*
- * Add JWT token to every request
- */
+// ======================================================
+// ADD TOKEN TO EVERY REQUEST
+// ======================================================
+
 api.interceptors.request.use(
   (config) => {
-    const token =
-      localStorage.getItem("token");
-
+    const token = localStorage.getItem("token");
     if (token) {
-      config.headers.Authorization =
-        `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`;
     }
-
     return config;
-  }
+  },
+  (error) => Promise.reject(error)
 );
 
+// ======================================================
+// APP
+// ======================================================
+
 function App() {
-  /*
-   * ==============================================
-   * USER
-   * ==============================================
-   */
+  const [user, setUser] = useState(null);
 
-  const [user, setUser] = useState(() => {
-    const savedUser =
-      localStorage.getItem("user");
+  const [ministries, setMinistries] = useState([]);
+  const [departments, setDepartments] = useState([]);
 
-    return savedUser
-      ? JSON.parse(savedUser)
-      : null;
-  });
+  const [activePage, setActivePage] = useState("dashboard");
 
-  /*
-   * ==============================================
-   * PAGE
-   * ==============================================
-   */
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [page, setPage] =
-    useState("dashboard");
+  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState(null);
+  const [departmentName, setDepartmentName] = useState("");
+  const [savingDepartment, setSavingDepartment] = useState(false);
 
-  /*
-   * ==============================================
-   * DATA
-   * ==============================================
-   */
-
-  const [ministries, setMinistries] =
-    useState([]);
-
-  const [departments, setDepartments] =
-    useState([]);
-
-  /*
-   * ==============================================
-   * UI
-   * ==============================================
-   */
-
-  const [selectedMinistry, setSelectedMinistry] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  /*
-   * ==============================================
-   * DEPARTMENT FORM
-   * ==============================================
-   */
-
-  const [showDepartmentModal, setShowDepartmentModal] =
-    useState(false);
-
-  const [editingDepartment, setEditingDepartment] =
-    useState(null);
-
-  const [departmentForm, setDepartmentForm] =
-    useState({
-      name: "",
-      description: "",
-    });
-
-  /*
-   * ==============================================
-   * AUTHENTICATION CHECK
-   * ==============================================
-   */
+  // ======================================================
+  // LOAD AND VALIDATE USER
+  // ======================================================
 
   useEffect(() => {
-    const savedUser =
-      localStorage.getItem("user");
+    const loadCurrentUser = async () => {
+      const token = localStorage.getItem("token");
 
-    const token =
-      localStorage.getItem("token");
-
-    /*
-     * If user did not come through
-     * the common login page,
-     * send them back there.
-     */
-
-    if (!savedUser || !token) {
-      window.location.href =
-        COMMON_PORTAL;
-
-      return;
-    }
-
-    try {
-      setUser(
-        JSON.parse(savedUser)
-      );
-    } catch (error) {
-      localStorage.removeItem(
-        "user"
-      );
-
-      localStorage.removeItem(
-        "token"
-      );
-
-      window.location.href =
-        COMMON_PORTAL;
-
-      return;
-    }
-
-    loadData();
-  }, []);
-
-  /*
-   * ==============================================
-   * LOAD ALL DATA
-   * ==============================================
-   */
-
-  const loadData = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const [
-        ministriesResponse,
-        departmentsResponse,
-      ] = await Promise.all([
-        api.get("/ministries"),
-        api.get("/departments"),
-      ]);
-
-      setMinistries(
-        ministriesResponse.data
-      );
-
-      setDepartments(
-        departmentsResponse.data
-      );
-    } catch (error) {
-      console.error(error);
-
-      if (
-        error.response?.status === 401
-      ) {
-        logout();
+      if (!token) {
+        window.location.href = COMMON_PORTAL;
         return;
       }
 
-      setError(
-        error.response?.data?.message ||
-          "Failed to load data."
-      );
+      try {
+        const response = await api.get("/auth/me");
+        setUser(response.data.user);
+      } catch (err) {
+        console.error("Authentication validation failed:", err);
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = COMMON_PORTAL;
+      }
+    };
+
+    loadCurrentUser();
+  }, []);
+
+  // ======================================================
+  // LOAD DATA
+  // ======================================================
+
+  useEffect(() => {
+    if (!user) return;
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const [ministriesResponse, departmentsResponse] =
+        await Promise.all([
+          api.get("/ministries"),
+          api.get("/departments"),
+        ]);
+
+      setMinistries(ministriesResponse.data || []);
+      setDepartments(departmentsResponse.data || []);
+    } catch (err) {
+      console.error("Failed to load data:", err);
+
+      if (err.response) {
+        setError(
+          err.response.data?.message ||
+            `Server returned ${err.response.status}`
+        );
+
+        if (err.response.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          window.location.href = COMMON_PORTAL;
+        }
+      } else if (err.request) {
+        setError(
+          "Cannot connect to Ministry backend at http://localhost:5002. " +
+            "Make sure the server is running."
+        );
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  /*
-   * ==============================================
-   * LOGOUT
-   * ==============================================
-   */
+  // ======================================================
+  // ASSIGNED MINISTRY
+  // ======================================================
 
-  const logout = () => {
-    localStorage.removeItem(
-      "token"
+  const assignedMinistryId =
+    user?.ministries?.length > 0 ? String(user.ministries[0]) : null;
+
+  const assignedMinistry = useMemo(() => {
+    if (!assignedMinistryId) return null;
+    return ministries.find(
+      (ministry) => String(ministry._id) === assignedMinistryId
     );
+  }, [ministries, assignedMinistryId]);
 
-    localStorage.removeItem(
-      "user"
-    );
+  // ======================================================
+  // CHECK OWN MINISTRY
+  // ======================================================
 
-    setUser(null);
-    setMinistries([]);
-    setDepartments([]);
-
-    /*
-     * Return to common Home page
-     */
-    window.location.href =
-      COMMON_PORTAL;
+  const isOwnMinistry = (ministryId) => {
+    if (!assignedMinistryId || !ministryId) return false;
+    return String(ministryId) === String(assignedMinistryId);
   };
 
-  /*
-   * ==============================================
-   * CHECK OWN MINISTRY
-   * ==============================================
-   */
+  // ======================================================
+  // OWN DEPARTMENTS
+  // ======================================================
 
-  const isOwnMinistry = (
-    ministryId
-  ) => {
-    if (!user?.ministry?._id) {
-      return false;
-    }
+  const ownDepartments = useMemo(() => {
+    return departments.filter((department) => {
+      const ministryId =
+        department.ministry?._id || department.ministry;
+      return isOwnMinistry(ministryId);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departments, assignedMinistryId]);
 
-    return (
-      user.ministry._id.toString() ===
-      ministryId?.toString()
-    );
+  // ======================================================
+  // LOGOUT
+  // ======================================================
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = COMMON_PORTAL;
   };
 
-  /*
-   * ==============================================
-   * GET OWN DEPARTMENTS
-   * ==============================================
-   */
-
-  const ownDepartments =
-    departments.filter(
-      (department) =>
-        department.ministry?._id ===
-        user?.ministry?._id ||
-        department.ministryId ===
-        user?.ministry?._id
-    );
-
-  /*
-   * ==============================================
-   * OPEN ADD DEPARTMENT
-   * ==============================================
-   */
+  // ======================================================
+  // ADD DEPARTMENT
+  // ======================================================
 
   const openAddDepartment = () => {
-    if (!user?.ministry?._id) {
-      setError(
-        "Your account is not assigned to a ministry."
-      );
-
+    if (!assignedMinistryId) {
+      alert("No ministry has been assigned to your account.");
       return;
     }
 
     setEditingDepartment(null);
-
-    setDepartmentForm({
-      name: "",
-      description: "",
-    });
-
+    setDepartmentName("");
     setShowDepartmentModal(true);
   };
 
-  /*
-   * ==============================================
-   * OPEN EDIT DEPARTMENT
-   * ==============================================
-   */
+  // ======================================================
+  // EDIT DEPARTMENT
+  // ======================================================
 
-  const openEditDepartment = (
-    department
-  ) => {
-    if (
-      !isOwnMinistry(
-        department.ministry?._id ||
-          department.ministryId
-      )
-    ) {
-      setError(
-        "You can only edit departments within your assigned ministry."
-      );
+  const openEditDepartment = (department) => {
+    const ministryId =
+      department.ministry?._id || department.ministry;
 
+    if (!isOwnMinistry(ministryId)) {
+      alert("You can only edit departments under your ministry.");
       return;
     }
 
-    setEditingDepartment(
-      department
-    );
-
-    setDepartmentForm({
-      name:
-        department.name || "",
-      description:
-        department.description ||
-        "",
-    });
-
-    setShowDepartmentModal(
-      true
-    );
+    setEditingDepartment(department);
+    setDepartmentName(department.name || "");
+    setShowDepartmentModal(true);
   };
 
-  /*
-   * ==============================================
-   * SAVE DEPARTMENT
-   * ==============================================
-   */
+  // ======================================================
+  // SAVE DEPARTMENT
+  // ======================================================
 
-  const saveDepartment = async (
-    event
-  ) => {
+  const handleSaveDepartment = async (event) => {
     event.preventDefault();
 
-    if (!departmentForm.name.trim()) {
-      setError(
-        "Department name is required."
-      );
+    const trimmedName = departmentName.trim();
 
+    if (!trimmedName) {
+      alert("Please enter a department name.");
       return;
     }
 
-    if (!user?.ministry?._id) {
-      setError(
-        "Your account is not assigned to a ministry."
-      );
-
+    if (!editingDepartment && !assignedMinistryId) {
+      alert("No ministry has been assigned to your account.");
       return;
     }
-
-    setLoading(true);
-    setError("");
 
     try {
-      /*
-       * EDIT
-       */
+      setSavingDepartment(true);
 
+      // EDIT
       if (editingDepartment) {
-        await api.patch(
+        const ministryId =
+          editingDepartment.ministry?._id ||
+          editingDepartment.ministry;
+
+        if (!isOwnMinistry(ministryId)) {
+          alert("You can only edit departments under your ministry.");
+          return;
+        }
+
+        const response = await api.patch(
           `/departments/${editingDepartment._id}`,
-          {
-            name:
-              departmentForm.name.trim(),
+          { name: trimmedName }
+        );
 
-            description:
-              departmentForm.description.trim(),
-          }
+        setDepartments((current) =>
+          current.map((department) =>
+            department._id === editingDepartment._id
+              ? response.data
+              : department
+          )
         );
       }
 
-      /*
-       * CREATE
-       */
-
+      // ADD
       else {
-        await api.post(
-          "/departments",
-          {
-            name:
-              departmentForm.name.trim(),
+        const response = await api.post("/departments", {
+          name: trimmedName,
+        });
 
-            description:
-              departmentForm.description.trim(),
-
-            ministryId:
-              user.ministry._id,
-          }
-        );
+        setDepartments((current) => [...current, response.data]);
       }
 
-      setShowDepartmentModal(
-        false
-      );
-
-      setEditingDepartment(
-        null
-      );
-
-      setDepartmentForm({
-        name: "",
-        description: "",
-      });
-
-      await loadData();
-    } catch (error) {
-      console.error(error);
-
-      setError(
-        error.response?.data?.message ||
-          "Failed to save department."
+      closeDepartmentModal();
+    } catch (err) {
+      console.error("Failed to save department:", err);
+      alert(
+        err.response?.data?.message || "Failed to save department."
       );
     } finally {
-      setLoading(false);
+      setSavingDepartment(false);
     }
   };
 
-  /*
-   * ==============================================
-   * DELETE DEPARTMENT
-   * ==============================================
-   */
+  // ======================================================
+  // DELETE DEPARTMENT
+  // ======================================================
 
-  const deleteDepartment = async (
-    department
-  ) => {
-    if (
-      !isOwnMinistry(
-        department.ministry?._id ||
-          department.ministryId
-      )
-    ) {
-      setError(
-        "You can only delete departments within your assigned ministry."
-      );
+  const handleDeleteDepartment = async (department) => {
+    const ministryId =
+      department.ministry?._id || department.ministry;
 
+    if (!isOwnMinistry(ministryId)) {
+      alert("You can only delete departments under your ministry.");
       return;
     }
 
-    const confirmed =
-      window.confirm(
-        `Are you sure you want to delete "${department.name}"?`
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      await api.delete(
-        `/departments/${department._id}`
-      );
-
-      await loadData();
-    } catch (error) {
-      console.error(error);
-
-      setError(
-        error.response?.data?.message ||
-          "Failed to delete department."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /*
-   * ==============================================
-   * MINISTRY DETAILS
-   * ==============================================
-   */
-
-  const openMinistry = (
-    ministry
-  ) => {
-    setSelectedMinistry(
-      ministry
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${department.name}"?`
     );
 
-    setPage("ministry-details");
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/departments/${department._id}`);
+      setDepartments((current) =>
+        current.filter((item) => item._id !== department._id)
+      );
+    } catch (err) {
+      console.error("Failed to delete department:", err);
+      alert(
+        err.response?.data?.message || "Failed to delete department."
+      );
+    }
   };
 
-  /*
-   * ==============================================
-   * NOT LOGGED IN
-   * ==============================================
-   */
+  // ======================================================
+  // CLOSE MODAL
+  // ======================================================
 
-  if (!user) {
-    return null;
+  const closeDepartmentModal = () => {
+    setShowDepartmentModal(false);
+    setEditingDepartment(null);
+    setDepartmentName("");
+  };
+
+  // ======================================================
+  // LOADING
+  // ======================================================
+
+  if (!user || loading) {
+    return (
+      <div className="app-loading">
+        <div>
+          <h2>Ministry Management System</h2>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  /*
-   * ==============================================
-   * DASHBOARD
-   * ==============================================
-   */
-
-  const renderDashboard =
-    () => {
-      return (
-        <div className="page-content">
-          <div className="page-header">
-            <div>
-              <p className="eyebrow">
-                MINISTRY PORTAL
-              </p>
-
-              <h2>
-                Welcome, {user.name}
-              </h2>
-
-              <p>
-                View ministries and
-                departments available
-                within the system.
-              </p>
-            </div>
-          </div>
-
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
-
-          <div className="stats-grid">
-            <div className="stat-card">
-              <span>
-                Total Ministries
-              </span>
-
-              <strong>
-                {ministries.length}
-              </strong>
-            </div>
-
-            <div className="stat-card">
-              <span>
-                Total Departments
-              </span>
-
-              <strong>
-                {departments.length}
-              </strong>
-            </div>
-
-            <div className="stat-card">
-              <span>
-                My Departments
-              </span>
-
-              <strong>
-                {ownDepartments.length}
-              </strong>
-            </div>
-          </div>
-
-          <section className="content-card">
-            <div className="section-header">
-              <div>
-                <h3>
-                  All Departments
-                </h3>
-
-                <p>
-                  All authorized ministry
-                  users can view departments.
-                </p>
-              </div>
-
-              <button
-                className="primary-button"
-                onClick={
-                  openAddDepartment
-                }
-              >
-                + Add Department
-              </button>
-            </div>
-
-            {departments.length === 0 ? (
-              <p className="empty-state">
-                No departments found.
-              </p>
-            ) : (
-              <div className="department-grid">
-                {departments.map(
-                  (department) => {
-                    const own =
-                      isOwnMinistry(
-                        department
-                          .ministry?._id ||
-                          department.ministryId
-                      );
-
-                    return (
-                      <div
-                        className="department-card"
-                        key={
-                          department._id
-                        }
-                      >
-                        <div>
-                          <h4>
-                            {
-                              department.name
-                            }
-                          </h4>
-
-                          <p>
-                            {
-                              department.description ||
-                              "No description available."
-                            }
-                          </p>
-
-                          <small>
-                            Ministry:{" "}
-                            {department
-                              .ministry
-                              ?.name ||
-                              "Unknown"}
-                          </small>
-                        </div>
-
-                        {own && (
-                          <div className="card-actions">
-                            <button
-                              onClick={() =>
-                                openEditDepartment(
-                                  department
-                                )
-                              }
-                            >
-                              Edit
-                            </button>
-
-                            <button
-                              onClick={() =>
-                                deleteDepartment(
-                                  department
-                                )
-                              }
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                )}
-              </div>
-            )}
-          </section>
-        </div>
-      );
-    };
-
-  /*
-   * ==============================================
-   * MINISTRIES
-   * ==============================================
-   */
-
-  const renderMinistries =
-    () => {
-      return (
-        <div className="page-content">
-          <div className="page-header">
-            <p className="eyebrow">
-              MINISTRIES
-            </p>
-
-            <h2>
-              All Ministries
-            </h2>
-
-            <p>
-              View all ministries registered
-              in the system.
-            </p>
-          </div>
-
-          <div className="ministry-grid">
-            {ministries.map(
-              (ministry) => (
-                <button
-                  className="ministry-card"
-                  key={ministry._id}
-                  onClick={() =>
-                    openMinistry(
-                      ministry
-                    )
-                  }
-                >
-                  <h3>
-                    {ministry.name}
-                  </h3>
-
-                  <span>
-                    View Ministry →
-                  </span>
-                </button>
-              )
-            )}
-          </div>
-        </div>
-      );
-    };
-
-  /*
-   * ==============================================
-   * MINISTRY DETAILS
-   * ==============================================
-   */
-
-  const renderMinistryDetails =
-    () => {
-      if (!selectedMinistry) {
-        return null;
-      }
-
-      const ministryDepartments =
-        departments.filter(
-          (department) =>
-            department.ministry?._id ===
-              selectedMinistry._id ||
-            department.ministryId ===
-              selectedMinistry._id
-        );
-
-      return (
-        <div className="page-content">
-          <button
-            className="back-link"
-            onClick={() =>
-              setPage(
-                "ministries"
-              )
-            }
-          >
-            ← Back to Ministries
-          </button>
-
-          <div className="page-header">
-            <p className="eyebrow">
-              MINISTRY
-            </p>
-
-            <h2>
-              {selectedMinistry.name}
-            </h2>
-          </div>
-
-          <section className="content-card">
-            <div className="section-header">
-              <div>
-                <h3>
-                  Departments
-                </h3>
-
-                <p>
-                  Departments belonging
-                  to this ministry.
-                </p>
-              </div>
-            </div>
-
-            {ministryDepartments.length ===
-            0 ? (
-              <p className="empty-state">
-                No departments found.
-              </p>
-            ) : (
-              <div className="department-grid">
-                {ministryDepartments.map(
-                  (department) => (
-                    <div
-                      className="department-card"
-                      key={
-                        department._id
-                      }
-                    >
-                      <h4>
-                        {
-                          department.name
-                        }
-                      </h4>
-
-                      <p>
-                        {
-                          department.description ||
-                          "No description available."
-                        }
-                      </p>
-                    </div>
-                  )
-                )}
-              </div>
-            )}
-          </section>
-        </div>
-      );
-    };
-
-  /*
-   * ==============================================
-   * MY DEPARTMENTS
-   * ==============================================
-   */
-
-  const renderMyDepartments =
-    () => {
-      return (
-        <div className="page-content">
-          <div className="page-header">
-            <p className="eyebrow">
-              MY MINISTRY
-            </p>
-
-            <h2>
-              My Departments
-            </h2>
-
-            <p>
-              Manage departments belonging
-              to your assigned ministry.
-            </p>
-          </div>
-
-          <div className="section-header">
-            <div>
-              <h3>
-                {user.ministry?.name ||
-                  "Assigned Ministry"}
-              </h3>
-            </div>
-
-            <button
-              className="primary-button"
-              onClick={
-                openAddDepartment
-              }
-            >
-              + Add Department
-            </button>
-          </div>
-
-          <div className="department-grid">
-            {ownDepartments.length ===
-            0 ? (
-              <p className="empty-state">
-                No departments found for
-                your ministry.
-              </p>
-            ) : (
-              ownDepartments.map(
-                (department) => (
-                  <div
-                    className="department-card"
-                    key={
-                      department._id
-                    }
-                  >
-                    <h4>
-                      {
-                        department.name
-                      }
-                    </h4>
-
-                    <p>
-                      {
-                        department.description ||
-                        "No description available."
-                      }
-                    </p>
-
-                    <div className="card-actions">
-                      <button
-                        onClick={() =>
-                          openEditDepartment(
-                            department
-                          )
-                        }
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          deleteDepartment(
-                            department
-                          )
-                        }
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                )
-              )
-            )}
-          </div>
-        </div>
-      );
-    };
-
-  /*
-   * ==============================================
-   * MAIN PORTAL
-   * ==============================================
-   */
+  // ======================================================
+  // MAIN UI
+  // ======================================================
 
   return (
-    <div className="app-shell">
+    <div className="app-container">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <img
-            src="/gov-logo.jpg"
-            alt="Government of Sri Lanka"
-          />
-
-          <div>
-            <strong>
-              Ministry & Department
-            </strong>
-
-            <span>
-              Management System
-            </span>
-          </div>
+          <h2>Ministry Management</h2>
         </div>
 
-        <nav>
+        <nav className="sidebar-nav">
           <button
             className={
-              page === "dashboard"
-                ? "active"
-                : ""
+              activePage === "dashboard"
+                ? "nav-item active"
+                : "nav-item"
             }
-            onClick={() =>
-              setPage("dashboard")
-            }
+            onClick={() => setActivePage("dashboard")}
           >
             Dashboard
           </button>
 
           <button
             className={
-              page === "ministries" ||
-              page ===
-                "ministry-details"
-                ? "active"
-                : ""
+              activePage === "ministries"
+                ? "nav-item active"
+                : "nav-item"
             }
-            onClick={() =>
-              setPage("ministries")
-            }
+            onClick={() => setActivePage("ministries")}
           >
             Ministries
           </button>
 
           <button
             className={
-              page ===
-              "my-departments"
-                ? "active"
-                : ""
+              activePage === "departments"
+                ? "nav-item active"
+                : "nav-item"
             }
-            onClick={() =>
-              setPage(
-                "my-departments"
-              )
-            }
+            onClick={() => setActivePage("departments")}
           >
             My Departments
           </button>
         </nav>
 
-        <div className="sidebar-user">
-          <strong>
-            {user.name}
-          </strong>
+        <div className="sidebar-bottom">
+          <div className="user-info">
+            <strong>{user.name}</strong>
+            {user.email && <span>{user.email}</span>}
+            <small>{user.role}</small>
+          </div>
 
-          <span>
-            {user.email}
-          </span>
-
-          <span>
-            {user.ministry?.name ||
-              "No Ministry Assigned"}
-          </span>
-
-          <button
-            onClick={logout}
-          >
+          <button className="logout-button" onClick={handleLogout}>
             Logout
           </button>
         </div>
       </aside>
 
       <main className="main-content">
-        {loading && (
-          <div className="loading-bar">
-            Loading...
+        <header className="topbar">
+          <div>
+            <h1>
+              {activePage === "dashboard" && "Dashboard"}
+              {activePage === "ministries" && "Ministries"}
+              {activePage === "departments" && "My Departments"}
+            </h1>
+            <p>Ministry &amp; Department Management System</p>
+          </div>
+        </header>
+
+        {error && (
+          <div className="error-message">
+            <strong>Error:</strong> {error}
+            <button onClick={loadData}>Retry</button>
           </div>
         )}
 
-        {page === "dashboard" &&
-          renderDashboard()}
+        {/* DASHBOARD */}
+        {activePage === "dashboard" && (
+          <section className="page-content">
+            <div className="welcome-card">
+              <h2>Welcome, {user.name}</h2>
+              <p>
+                Manage departments belonging to your assigned
+                ministry.
+              </p>
+            </div>
 
-        {page === "ministries" &&
-          renderMinistries()}
+            <div className="stats-grid">
+              <div className="stat-card">
+                <h3>Total Ministries</h3>
+                <strong>{ministries.length}</strong>
+              </div>
 
-        {page ===
-          "ministry-details" &&
-          renderMinistryDetails()}
+              <div className="stat-card">
+                <h3>Total Departments</h3>
+                <strong>{departments.length}</strong>
+              </div>
 
-        {page ===
-          "my-departments" &&
-          renderMyDepartments()}
-      </main>
+              <div className="stat-card">
+                <h3>My Departments</h3>
+                <strong>{ownDepartments.length}</strong>
+              </div>
+            </div>
 
-      /*
-       * ============================================
-       * DEPARTMENT MODAL
-       * ============================================
-       */
+            <div className="info-card">
+              <h3>Assigned Ministry</h3>
+              {assignedMinistry ? (
+                <p>{assignedMinistry.name}</p>
+              ) : (
+                <p>No ministry has been assigned to your account.</p>
+              )}
+            </div>
+          </section>
+        )}
 
-      {showDepartmentModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
+        {/* MINISTRIES */}
+        {activePage === "ministries" && (
+          <section className="page-content">
+            <div className="section-header">
               <div>
-                <p className="eyebrow">
-                  {editingDepartment
-                    ? "EDIT DEPARTMENT"
-                    : "NEW DEPARTMENT"}
-                </p>
+                <h2>All Ministries</h2>
+                <p>View all ministries and their departments.</p>
+              </div>
+            </div>
 
-                <h2>
-                  {editingDepartment
-                    ? "Edit Department"
-                    : "Add Department"}
-                </h2>
+            <div className="ministry-list">
+              {ministries.length === 0 ? (
+                <div className="empty-state">
+                  No ministries found.
+                </div>
+              ) : (
+                ministries.map((ministry) => {
+                  const ministryDepartments =
+                    departments.filter((department) => {
+                      const departmentMinistryId =
+                        department.ministry?._id ||
+                        department.ministry;
+                      return (
+                        String(departmentMinistryId) ===
+                        String(ministry._id)
+                      );
+                    });
+
+                  const canManage = isOwnMinistry(ministry._id);
+
+                  return (
+                    <div
+                      className="ministry-card"
+                      key={ministry._id}
+                    >
+                      <div className="ministry-card-header">
+                        <div>
+                          <h3>{ministry.name}</h3>
+                          {canManage && (
+                            <span className="assigned-label">
+                              Your Ministry
+                            </span>
+                          )}
+                        </div>
+                        <span>
+                          {ministryDepartments.length} department
+                          {ministryDepartments.length !== 1
+                            ? "s"
+                            : ""}
+                        </span>
+                      </div>
+
+                      <div className="department-list">
+                        {ministryDepartments.length === 0 ? (
+                          <p className="empty-text">
+                            No departments.
+                          </p>
+                        ) : (
+                          ministryDepartments.map((department) => (
+                            <div
+                              className="department-row"
+                              key={department._id}
+                            >
+                              <span>{department.name}</span>
+
+                              {canManage && (
+                                <div className="row-actions">
+                                  <button
+                                    onClick={() =>
+                                      openEditDepartment(
+                                        department
+                                      )
+                                    }
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    className="delete-button"
+                                    onClick={() =>
+                                      handleDeleteDepartment(
+                                        department
+                                      )
+                                    }
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* MY DEPARTMENTS */}
+        {activePage === "departments" && (
+          <section className="page-content">
+            <div className="section-header">
+              <div>
+                <h2>My Departments</h2>
+                <p>
+                  {assignedMinistry
+                    ? `Departments under ${assignedMinistry.name}`
+                    : "No ministry assigned"}
+                </p>
               </div>
 
               <button
+                className="primary-button"
+                onClick={openAddDepartment}
+                disabled={!assignedMinistryId}
+              >
+                + Add Department
+              </button>
+            </div>
+
+            {!assignedMinistry ? (
+              <div className="empty-state">
+                <h3>No Ministry Assigned</h3>
+                <p>
+                  Your account has not been assigned to a ministry.
+                  Please contact the administrator.
+                </p>
+              </div>
+            ) : ownDepartments.length === 0 ? (
+              <div className="empty-state">
+                <h3>No Departments</h3>
+                <p>
+                  There are currently no departments under your
+                  assigned ministry.
+                </p>
+              </div>
+            ) : (
+              <div className="department-table">
+                <div className="table-header">
+                  <span>Department Name</span>
+                  <span>Actions</span>
+                </div>
+
+                {ownDepartments.map((department) => (
+                  <div
+                    className="table-row"
+                    key={department._id}
+                  >
+                    <span>{department.name}</span>
+                    <div className="row-actions">
+                      <button
+                        onClick={() =>
+                          openEditDepartment(department)
+                        }
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="delete-button"
+                        onClick={() =>
+                          handleDeleteDepartment(department)
+                        }
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+      </main>
+
+      {/* MODAL */}
+      {showDepartmentModal && (
+        <div
+          className="modal-overlay"
+          onClick={closeDepartmentModal}
+        >
+          <div
+            className="modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>
+                {editingDepartment
+                  ? "Edit Department"
+                  : "Add Department"}
+              </h2>
+              <button
                 className="close-button"
-                onClick={() =>
-                  setShowDepartmentModal(
-                    false
-                  )
-                }
+                onClick={closeDepartmentModal}
               >
                 ×
               </button>
             </div>
 
-            <form
-              onSubmit={
-                saveDepartment
-              }
-            >
-              <label>
-                Ministry
-              </label>
+            <form onSubmit={handleSaveDepartment}>
+              <div className="form-group">
+                <label>Ministry</label>
+                <input
+                  type="text"
+                  value={assignedMinistry?.name || ""}
+                  disabled
+                />
+              </div>
 
-              <input
-                value={
-                  user.ministry?.name ||
-                  ""
-                }
-                disabled
-              />
-
-              <label>
-                Department Name
-              </label>
-
-              <input
-                value={
-                  departmentForm.name
-                }
-                onChange={(event) =>
-                  setDepartmentForm({
-                    ...departmentForm,
-                    name:
-                      event.target.value,
-                  })
-                }
-                placeholder="Enter department name"
-                required
-              />
-
-              <label>
-                Description
-              </label>
-
-              <textarea
-                value={
-                  departmentForm.description
-                }
-                onChange={(event) =>
-                  setDepartmentForm({
-                    ...departmentForm,
-                    description:
-                      event.target.value,
-                  })
-                }
-                placeholder="Enter department description"
-                rows="4"
-              />
+              <div className="form-group">
+                <label>Department Name</label>
+                <input
+                  type="text"
+                  value={departmentName}
+                  onChange={(event) =>
+                    setDepartmentName(event.target.value)
+                  }
+                  placeholder="Enter department name"
+                  autoFocus
+                />
+              </div>
 
               <div className="modal-actions">
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowDepartmentModal(
-                      false
-                    )
-                  }
+                  onClick={closeDepartmentModal}
+                  disabled={savingDepartment}
                 >
                   Cancel
                 </button>
-
                 <button
                   type="submit"
                   className="primary-button"
-                  disabled={loading}
+                  disabled={savingDepartment}
                 >
-                  {loading
+                  {savingDepartment
                     ? "Saving..."
                     : editingDepartment
                     ? "Update Department"
