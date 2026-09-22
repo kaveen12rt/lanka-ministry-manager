@@ -13,6 +13,7 @@ app.use(express.json());
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
+    email: { type: String, trim: true, lowercase: true },
     password: { type: String, required: true, trim: true },
     role: { type: String, default: 'Editor' },
     ministries: { type: [String], default: [] },
@@ -69,10 +70,14 @@ app.post('/api/users', async (req, res) => {
       return res.status(503).json({ message: 'MongoDB is not connected. Add this machine IP to MongoDB Atlas Network Access.' });
     }
 
-    const { name, password, role, ministries } = req.body;
+    const { name, email, password, role, ministries } = req.body;
 
-    if (!name || !password) {
-      return res.status(400).json({ message: 'Name and password are required.' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Username, email, and password are required.' });
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      return res.status(400).json({ message: 'Please provide a valid email address.' });
     }
 
     if (password === process.env.ADMIN_PASSWORD) {
@@ -88,6 +93,7 @@ app.post('/api/users', async (req, res) => {
 
     const newUser = new User({
       name: name.trim(),
+      email: email.trim().toLowerCase(),
       password: password.trim(),
       role: role || 'Editor',
       ministries: Array.isArray(ministries) ? ministries : [],
@@ -106,7 +112,7 @@ app.patch('/api/users/:id', async (req, res) => {
       return res.status(503).json({ message: 'MongoDB is not connected.' });
     }
 
-    const { name, password, ministries, isBlocked } = req.body;
+    const { name, email, password, ministries, isBlocked } = req.body;
     const updates = {};
 
     if (name !== undefined) {
@@ -120,6 +126,13 @@ app.patch('/api/users/:id', async (req, res) => {
         return res.status(400).json({ message: 'This password is reserved for the admin account.' });
       }
       updates.password = password.trim();
+    }
+
+    if (email !== undefined) {
+      if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) {
+        return res.status(400).json({ message: 'Please provide a valid email address.' });
+      }
+      updates.email = email.trim().toLowerCase();
     }
 
     if (isBlocked !== undefined) updates.isBlocked = Boolean(isBlocked);
