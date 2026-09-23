@@ -44,10 +44,19 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
-  const [editingDepartment, setEditingDepartment] = useState(null);
+  const [showDepartmentModal, setShowDepartmentModal] =
+    useState(false);
+
+  const [editingDepartment, setEditingDepartment] =
+    useState(null);
+
   const [departmentName, setDepartmentName] = useState("");
-  const [savingDepartment, setSavingDepartment] = useState(false);
+
+  const [selectedDepartmentMinistryId, setSelectedDepartmentMinistryId] =
+    useState("");
+
+  const [savingDepartment, setSavingDepartment] =
+    useState(false);
 
   // ======================================================
   // LOAD AND VALIDATE USER
@@ -64,9 +73,13 @@ function App() {
 
       try {
         const response = await api.get("/auth/me");
+
         setUser(response.data.user);
       } catch (err) {
-        console.error("Authentication validation failed:", err);
+        console.error(
+          "Authentication validation failed:",
+          err
+        );
 
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -95,11 +108,13 @@ function App() {
       setLoading(true);
       setError("");
 
-      const [ministriesResponse, departmentsResponse] =
-        await Promise.all([
-          api.get("/ministries"),
-          api.get("/departments"),
-        ]);
+      const [
+        ministriesResponse,
+        departmentsResponse,
+      ] = await Promise.all([
+        api.get("/ministries"),
+        api.get("/departments"),
+      ]);
 
       setMinistries(ministriesResponse.data || []);
       setDepartments(departmentsResponse.data || []);
@@ -115,6 +130,7 @@ function App() {
         if (err.response.status === 401) {
           localStorage.removeItem("token");
           localStorage.removeItem("user");
+
           window.location.href = COMMON_PORTAL;
         }
       } else if (err.request) {
@@ -130,32 +146,36 @@ function App() {
   };
 
   // ======================================================
-  // ASSIGNED MINISTRY
+  // ALL ASSIGNED MINISTRY IDS
   // ======================================================
 
-  const assignedMinistryId =
-    user?.ministries?.length > 0
-      ? String(user.ministries[0])
-      : null;
-
-  const assignedMinistry = useMemo(() => {
-    if (!assignedMinistryId) return null;
-
-    return ministries.find(
-      (ministry) =>
-        String(ministry._id) === assignedMinistryId
+  const assignedMinistryIds = useMemo(() => {
+    return (user?.ministries || []).map((id) =>
+      String(id)
     );
-  }, [ministries, assignedMinistryId]);
+  }, [user]);
+
+  // ======================================================
+  // ALL ASSIGNED MINISTRIES
+  // ======================================================
+
+  const assignedMinistries = useMemo(() => {
+    return ministries.filter((ministry) =>
+      assignedMinistryIds.includes(
+        String(ministry._id)
+      )
+    );
+  }, [ministries, assignedMinistryIds]);
 
   // ======================================================
   // CHECK OWN MINISTRY
   // ======================================================
 
   const isOwnMinistry = (ministryId) => {
-    if (!assignedMinistryId || !ministryId) return false;
+    if (!ministryId) return false;
 
-    return (
-      String(ministryId) === String(assignedMinistryId)
+    return assignedMinistryIds.includes(
+      String(ministryId)
     );
   };
 
@@ -173,7 +193,7 @@ function App() {
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departments, assignedMinistryId]);
+  }, [departments, assignedMinistryIds]);
 
   // ======================================================
   // LOGOUT
@@ -191,7 +211,7 @@ function App() {
   // ======================================================
 
   const openAddDepartment = () => {
-    if (!assignedMinistryId) {
+    if (assignedMinistries.length === 0) {
       alert(
         "No ministry has been assigned to your account."
       );
@@ -200,6 +220,12 @@ function App() {
 
     setEditingDepartment(null);
     setDepartmentName("");
+
+    // Default to the first assigned ministry
+    setSelectedDepartmentMinistryId(
+      String(assignedMinistries[0]._id)
+    );
+
     setShowDepartmentModal(true);
   };
 
@@ -214,13 +240,18 @@ function App() {
 
     if (!isOwnMinistry(ministryId)) {
       alert(
-        "You can only edit departments under your ministry."
+        "You can only edit departments under your assigned ministries."
       );
       return;
     }
 
     setEditingDepartment(department);
     setDepartmentName(department.name || "");
+
+    setSelectedDepartmentMinistryId(
+      ministryId ? String(ministryId) : ""
+    );
+
     setShowDepartmentModal(true);
   };
 
@@ -238,29 +269,53 @@ function App() {
       return;
     }
 
-    if (!editingDepartment && !assignedMinistryId) {
-      alert(
-        "No ministry has been assigned to your account."
-      );
-      return;
+    // ==================================================
+    // EDIT VALIDATION
+    // ==================================================
+
+    if (editingDepartment) {
+      const existingMinistryId =
+        editingDepartment.ministry?._id ||
+        editingDepartment.ministry;
+
+      if (!isOwnMinistry(existingMinistryId)) {
+        alert(
+          "You can only edit departments under your assigned ministries."
+        );
+        return;
+      }
+    }
+
+    // ==================================================
+    // ADD VALIDATION
+    // ==================================================
+
+    if (!editingDepartment) {
+      if (!selectedDepartmentMinistryId) {
+        alert("Please select a ministry.");
+        return;
+      }
+
+      if (
+        !isOwnMinistry(
+          selectedDepartmentMinistryId
+        )
+      ) {
+        alert(
+          "You can only add departments to your assigned ministries."
+        );
+        return;
+      }
     }
 
     try {
       setSavingDepartment(true);
 
+      // ==================================================
       // EDIT
+      // ==================================================
+
       if (editingDepartment) {
-        const ministryId =
-          editingDepartment.ministry?._id ||
-          editingDepartment.ministry;
-
-        if (!isOwnMinistry(ministryId)) {
-          alert(
-            "You can only edit departments under your ministry."
-          );
-          return;
-        }
-
         const response = await api.patch(
           `/departments/${editingDepartment._id}`,
           {
@@ -270,18 +325,27 @@ function App() {
 
         setDepartments((current) =>
           current.map((department) =>
-            department._id === editingDepartment._id
+            department._id ===
+            editingDepartment._id
               ? response.data
               : department
           )
         );
       }
 
+      // ==================================================
       // ADD
+      // ==================================================
+
       else {
-        const response = await api.post("/departments", {
-          name: trimmedName,
-        });
+        const response = await api.post(
+          "/departments",
+          {
+            name: trimmedName,
+            ministry:
+              selectedDepartmentMinistryId,
+          }
+        );
 
         setDepartments((current) => [
           ...current,
@@ -291,7 +355,10 @@ function App() {
 
       closeDepartmentModal();
     } catch (err) {
-      console.error("Failed to save department:", err);
+      console.error(
+        "Failed to save department:",
+        err
+      );
 
       alert(
         err.response?.data?.message ||
@@ -306,14 +373,16 @@ function App() {
   // DELETE DEPARTMENT
   // ======================================================
 
-  const handleDeleteDepartment = async (department) => {
+  const handleDeleteDepartment = async (
+    department
+  ) => {
     const ministryId =
       department.ministry?._id ||
       department.ministry;
 
     if (!isOwnMinistry(ministryId)) {
       alert(
-        "You can only delete departments under your ministry."
+        "You can only delete departments under your assigned ministries."
       );
       return;
     }
@@ -331,7 +400,8 @@ function App() {
 
       setDepartments((current) =>
         current.filter(
-          (item) => item._id !== department._id
+          (item) =>
+            item._id !== department._id
         )
       );
     } catch (err) {
@@ -355,6 +425,7 @@ function App() {
     setShowDepartmentModal(false);
     setEditingDepartment(null);
     setDepartmentName("");
+    setSelectedDepartmentMinistryId("");
   };
 
   // ======================================================
@@ -369,7 +440,10 @@ function App() {
           alt="Government of Sri Lanka"
         />
 
-        <h2>Ministry & Department Management System</h2>
+        <h2>
+          Ministry & Department Management System
+        </h2>
+
         <p>Loading your portal...</p>
       </div>
     );
@@ -394,7 +468,10 @@ function App() {
           />
 
           <div>
-            <strong>Government of Sri Lanka</strong>
+            <strong>
+              Government of Sri Lanka
+            </strong>
+
             <span>
               Ministry & Department Management System
             </span>
@@ -479,17 +556,25 @@ function App() {
           <div className="sidebar-divider" />
 
           <div className="sidebar-ministry">
-            <span>ASSIGNED MINISTRY</span>
+            <span>ASSIGNED MINISTRIES</span>
 
-            <strong>
-              {assignedMinistry
-                ? assignedMinistry.name
-                : "Not Assigned"}
-            </strong>
+            {assignedMinistries.length > 0 ? (
+              assignedMinistries.map(
+                (ministry) => (
+                  <strong key={ministry._id}>
+                    {ministry.name}
+                  </strong>
+                )
+              )
+            ) : (
+              <strong>Not Assigned</strong>
+            )}
           </div>
 
           <div className="sidebar-footer">
-            <span>Authorized Government User</span>
+            <span>
+              Authorized Government User
+            </span>
           </div>
         </aside>
 
@@ -532,8 +617,9 @@ function App() {
                   <h1>Dashboard</h1>
 
                   <p>
-                    Overview of ministries and departments
-                    available in the system.
+                    Overview of ministries and
+                    departments available in the
+                    system.
                   </p>
                 </div>
               </div>
@@ -550,10 +636,11 @@ function App() {
                     </h2>
 
                     <p>
-                      You can view all ministries and
-                      departments. Department management
-                      is available only for your assigned
-                      ministry.
+                      You can view all ministries
+                      and departments. Department
+                      management is available for
+                      all ministries assigned to
+                      your account.
                     </p>
                   </div>
                 </div>
@@ -567,7 +654,10 @@ function App() {
                   </div>
 
                   <div>
-                    <span>Total Ministries</span>
+                    <span>
+                      Total Ministries
+                    </span>
+
                     <strong>
                       {ministries.length}
                     </strong>
@@ -580,7 +670,10 @@ function App() {
                   </div>
 
                   <div>
-                    <span>Total Departments</span>
+                    <span>
+                      Total Departments
+                    </span>
+
                     <strong>
                       {departments.length}
                     </strong>
@@ -593,7 +686,10 @@ function App() {
                   </div>
 
                   <div>
-                    <span>My Departments</span>
+                    <span>
+                      My Departments
+                    </span>
+
                     <strong>
                       {ownDepartments.length}
                     </strong>
@@ -603,47 +699,89 @@ function App() {
               </div>
 
               <div className="content-card assigned-card">
+
                 <div className="card-heading">
                   <div>
                     <p className="card-eyebrow">
                       YOUR ACCESS
                     </p>
 
-                    <h2>Assigned Ministry</h2>
+                    <h2>
+                      Assigned Ministries
+                    </h2>
                   </div>
                 </div>
 
-                {assignedMinistry ? (
-                  <div className="assigned-ministry">
-                    <div className="ministry-symbol">
-                      M
-                    </div>
+                {assignedMinistries.length > 0 ? (
+                  <div className="assigned-ministry-list">
 
-                    <div>
-                      <strong>
-                        {assignedMinistry.name}
-                      </strong>
+                    {assignedMinistries.map(
+                      (ministry) => {
 
-                      <span>
-                        {ownDepartments.length} department
-                        {ownDepartments.length !== 1
-                          ? "s"
-                          : ""}{" "}
-                        under your management
-                      </span>
-                    </div>
+                        const ministryDepartmentCount =
+                          departments.filter(
+                            (department) => {
+                              const departmentMinistryId =
+                                department.ministry?._id ||
+                                department.ministry;
+
+                              return (
+                                String(
+                                  departmentMinistryId
+                                ) ===
+                                String(
+                                  ministry._id
+                                )
+                              );
+                            }
+                          ).length;
+
+                        return (
+                          <div
+                            className="assigned-ministry"
+                            key={ministry._id}
+                          >
+                            <div className="ministry-symbol">
+                              M
+                            </div>
+
+                            <div>
+                              <strong>
+                                {ministry.name}
+                              </strong>
+
+                              <span>
+                                {
+                                  ministryDepartmentCount
+                                }{" "}
+                                department
+                                {ministryDepartmentCount !==
+                                1
+                                  ? "s"
+                                  : ""}{" "}
+                                under your management
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+                    )}
+
                   </div>
                 ) : (
                   <div className="empty-state">
-                    <h3>No Ministry Assigned</h3>
+                    <h3>
+                      No Ministry Assigned
+                    </h3>
 
                     <p>
-                      Your account has not been assigned
-                      to a ministry. Please contact the
-                      administrator.
+                      Your account has not been
+                      assigned to a ministry. Please
+                      contact the administrator.
                     </p>
                   </div>
                 )}
+
               </div>
 
             </section>
@@ -671,21 +809,28 @@ function App() {
                 </div>
               </div>
 
-              {assignedMinistry && (
+              {assignedMinistries.length > 0 && (
                 <div className="own-ministry-banner">
+
                   <div className="banner-icon">
                     ✓
                   </div>
 
                   <div>
                     <strong>
-                      Your Assigned Ministry
+                      Your Assigned Ministries
                     </strong>
 
                     <span>
-                      {assignedMinistry.name}
+                      {assignedMinistries
+                        .map(
+                          (ministry) =>
+                            ministry.name
+                        )
+                        .join(", ")}
                     </span>
                   </div>
+
                 </div>
               )}
 
@@ -708,7 +853,8 @@ function App() {
                           return (
                             String(
                               departmentMinistryId
-                            ) === String(ministry._id)
+                            ) ===
+                            String(ministry._id)
                           );
                         }
                       );
@@ -731,6 +877,7 @@ function App() {
                         <div className="ministry-card-header">
 
                           <div className="ministry-title">
+
                             <div className="ministry-icon">
                               M
                             </div>
@@ -746,6 +893,7 @@ function App() {
                                 </span>
                               )}
                             </div>
+
                           </div>
 
                           <span className="department-count">
@@ -778,15 +926,20 @@ function App() {
                                   className="department-row"
                                   key={department._id}
                                 >
+
                                   <div className="department-name">
+
                                     <span className="department-dot" />
+
                                     <span>
                                       {department.name}
                                     </span>
+
                                   </div>
 
                                   {canManage && (
                                     <div className="row-actions">
+
                                       <button
                                         className="edit-button"
                                         onClick={() =>
@@ -808,8 +961,10 @@ function App() {
                                       >
                                         Delete
                                       </button>
+
                                     </div>
                                   )}
+
                                 </div>
                               )
                             )
@@ -847,73 +1002,105 @@ function App() {
             <section>
 
               <div className="page-heading">
+
                 <div>
                   <p className="eyebrow">
                     DEPARTMENT MANAGEMENT
                   </p>
 
-                  <h1>My Departments</h1>
+                  <h1>
+                    My Departments
+                  </h1>
 
                   <p>
-                    Manage departments under your assigned
-                    ministry.
+                    Manage departments under all
+                    ministries assigned to your
+                    account.
                   </p>
                 </div>
 
                 <button
                   className="primary-button"
                   onClick={openAddDepartment}
-                  disabled={!assignedMinistryId}
+                  disabled={
+                    assignedMinistries.length === 0
+                  }
                 >
                   + Add Department
                 </button>
+
               </div>
 
-              {!assignedMinistry ? (
+              {assignedMinistries.length === 0 ? (
+
                 <div className="empty-state large">
+
                   <div className="empty-icon">
                     !
                   </div>
 
-                  <h3>No Ministry Assigned</h3>
+                  <h3>
+                    No Ministry Assigned
+                  </h3>
 
                   <p>
-                    Your account has not been assigned to
-                    a ministry. Please contact the
-                    administrator.
+                    Your account has not been
+                    assigned to a ministry. Please
+                    contact the administrator.
                   </p>
+
                 </div>
+
               ) : (
                 <>
+
                   <div className="own-ministry-banner">
+
                     <div className="banner-icon">
                       M
                     </div>
 
                     <div>
+
                       <strong>
-                        {assignedMinistry.name}
+                        Assigned Ministries
                       </strong>
 
                       <span>
-                        You have permission to add, edit
-                        and delete departments under this
-                        ministry.
+                        {assignedMinistries
+                          .map(
+                            (ministry) =>
+                              ministry.name
+                          )
+                          .join(", ")}
                       </span>
+
+                      <small>
+                        You have permission to add,
+                        edit and delete departments
+                        under these ministries.
+                      </small>
+
                     </div>
+
                   </div>
 
                   {ownDepartments.length === 0 ? (
+
                     <div className="empty-state large">
+
                       <div className="empty-icon">
                         D
                       </div>
 
-                      <h3>No Departments</h3>
+                      <h3>
+                        No Departments
+                      </h3>
 
                       <p>
-                        There are currently no departments
-                        under your assigned ministry.
+                        There are currently no
+                        departments under your
+                        assigned ministries.
                       </p>
 
                       <button
@@ -924,18 +1111,22 @@ function App() {
                       >
                         + Add First Department
                       </button>
+
                     </div>
+
                   ) : (
+
                     <div className="content-card department-card">
 
                       <div className="card-heading">
+
                         <div>
                           <p className="card-eyebrow">
                             REGISTERED DEPARTMENTS
                           </p>
 
                           <h2>
-                            {assignedMinistry.name}
+                            My Assigned Ministries
                           </h2>
                         </div>
 
@@ -947,14 +1138,22 @@ function App() {
                             ? "s"
                             : ""}
                         </span>
+
                       </div>
 
                       <div className="table-container">
+
                         <table>
+
                           <thead>
                             <tr>
+
                               <th>
                                 Department Name
+                              </th>
+
+                              <th>
+                                Ministry
                               </th>
 
                               <th>
@@ -964,69 +1163,115 @@ function App() {
                               <th className="actions-column">
                                 Actions
                               </th>
+
                             </tr>
                           </thead>
 
                           <tbody>
+
                             {ownDepartments.map(
-                              (department) => (
-                                <tr
-                                  key={
-                                    department._id
-                                  }
-                                >
-                                  <td>
-                                    <div className="table-department">
-                                      <span className="department-dot" />
+                              (department) => {
 
-                                      <strong>
-                                        {
-                                          department.name
-                                        }
-                                      </strong>
-                                    </div>
-                                  </td>
+                                const departmentMinistryId =
+                                  department.ministry?._id ||
+                                  department.ministry;
 
-                                  <td>
-                                    <span className="status-badge">
-                                      Active
-                                    </span>
-                                  </td>
+                                const departmentMinistry =
+                                  ministries.find(
+                                    (ministry) =>
+                                      String(
+                                        ministry._id
+                                      ) ===
+                                      String(
+                                        departmentMinistryId
+                                      )
+                                  );
 
-                                  <td>
-                                    <div className="row-actions table-actions">
-                                      <button
-                                        className="edit-button"
-                                        onClick={() =>
-                                          openEditDepartment(
-                                            department
-                                          )
-                                        }
-                                      >
-                                        Edit
-                                      </button>
+                                return (
+                                  <tr
+                                    key={
+                                      department._id
+                                    }
+                                  >
 
-                                      <button
-                                        className="delete-button"
-                                        onClick={() =>
-                                          handleDeleteDepartment(
-                                            department
-                                          )
-                                        }
-                                      >
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )
+                                    <td>
+
+                                      <div className="table-department">
+
+                                        <span className="department-dot" />
+
+                                        <strong>
+                                          {
+                                            department.name
+                                          }
+                                        </strong>
+
+                                      </div>
+
+                                    </td>
+
+                                    <td>
+
+                                      <span>
+                                        {departmentMinistry
+                                          ? departmentMinistry.name
+                                          : "Unknown Ministry"}
+                                      </span>
+
+                                    </td>
+
+                                    <td>
+
+                                      <span className="status-badge">
+                                        Active
+                                      </span>
+
+                                    </td>
+
+                                    <td>
+
+                                      <div className="row-actions table-actions">
+
+                                        <button
+                                          className="edit-button"
+                                          onClick={() =>
+                                            openEditDepartment(
+                                              department
+                                            )
+                                          }
+                                        >
+                                          Edit
+                                        </button>
+
+                                        <button
+                                          className="delete-button"
+                                          onClick={() =>
+                                            handleDeleteDepartment(
+                                              department
+                                            )
+                                          }
+                                        >
+                                          Delete
+                                        </button>
+
+                                      </div>
+
+                                    </td>
+
+                                  </tr>
+                                );
+                              }
                             )}
+
                           </tbody>
+
                         </table>
+
                       </div>
 
                     </div>
                   )}
+
                 </>
               )}
 
@@ -1045,6 +1290,7 @@ function App() {
           className="modal-overlay"
           onClick={closeDepartmentModal}
         >
+
           <div
             className="modal"
             onClick={(event) =>
@@ -1055,6 +1301,7 @@ function App() {
             <div className="modal-header">
 
               <div>
+
                 <p className="card-eyebrow">
                   DEPARTMENT MANAGEMENT
                 </p>
@@ -1068,8 +1315,9 @@ function App() {
                 <p>
                   {editingDepartment
                     ? "Update the department information."
-                    : "Register a new department under your ministry."}
+                    : "Register a new department under one of your assigned ministries."}
                 </p>
+
               </div>
 
               <button
@@ -1087,22 +1335,83 @@ function App() {
               onSubmit={handleSaveDepartment}
             >
 
+              {/* ==================================================
+                  MINISTRY SELECTION
+              ================================================== */}
+
               <div className="form-group">
-                <label>Assigned Ministry</label>
 
-                <div className="readonly-field">
-                  <span className="ministry-icon small">
-                    M
-                  </span>
+                <label htmlFor="departmentMinistry">
+                  Ministry
+                </label>
 
-                  <span>
-                    {assignedMinistry?.name ||
-                      "No ministry assigned"}
-                  </span>
-                </div>
+                {editingDepartment ? (
+
+                  <div className="readonly-field">
+
+                    <span className="ministry-icon small">
+                      M
+                    </span>
+
+                    <span>
+                      {
+                        assignedMinistries.find(
+                          (ministry) =>
+                            String(
+                              ministry._id
+                            ) ===
+                            String(
+                              selectedDepartmentMinistryId
+                            )
+                        )?.name ||
+                        "Assigned Ministry"
+                      }
+                    </span>
+
+                  </div>
+
+                ) : (
+
+                  <select
+                    id="departmentMinistry"
+                    value={
+                      selectedDepartmentMinistryId
+                    }
+                    onChange={(event) =>
+                      setSelectedDepartmentMinistryId(
+                        event.target.value
+                      )
+                    }
+                    required
+                  >
+
+                    <option value="">
+                      Select Ministry
+                    </option>
+
+                    {assignedMinistries.map(
+                      (ministry) => (
+                        <option
+                          key={ministry._id}
+                          value={ministry._id}
+                        >
+                          {ministry.name}
+                        </option>
+                      )
+                    )}
+
+                  </select>
+
+                )}
+
               </div>
 
+              {/* ==================================================
+                  DEPARTMENT NAME
+              ================================================== */}
+
               <div className="form-group">
+
                 <label htmlFor="departmentName">
                   Department Name
                 </label>
@@ -1119,7 +1428,12 @@ function App() {
                   placeholder="Enter department name"
                   autoFocus
                 />
+
               </div>
+
+              {/* ==================================================
+                  MODAL ACTIONS
+              ================================================== */}
 
               <div className="modal-actions">
 
@@ -1149,6 +1463,7 @@ function App() {
               </div>
 
             </form>
+
           </div>
         </div>
       )}
@@ -1158,4 +1473,3 @@ function App() {
 }
 
 export default App;
-
