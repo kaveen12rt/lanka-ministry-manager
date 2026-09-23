@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/apps/portal/" },
+    { "source": "/portal/:path*", "destination": "/apps/portal/:path*" },
+    { "source": "/admin/:path*", "destination": "/apps/admin/:path*" },
+    { "source": "/user/:path*", "destination": "/apps/user/:path*" }
+  ]
+}

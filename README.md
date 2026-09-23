@@ -14,6 +14,42 @@ The system provides a **Public Portal** for citizens to search and browse instit
 *   **Database:** MongoDB (Mongoose ORM)
 *   **Authentication:** JWT (JSON Web Tokens) for secure Admin access
 
+## Project structure
+
+The project uses one deployable frontend and one deployable backend:
+
+```text
+frontend/
+	apps/portal/   Public login portal
+	apps/admin/    Admin dashboard
+	apps/user/     Ministry user dashboard
+backend/
+	server.js      Admin API and ministry-user API on one port
+```
+
+The frontend uses the same-origin `/api` path by default. Set `VITE_API_URL` only
+when the frontend and backend are deployed to different domains.
+
+## Local run
+
+```bash
+npm install
+npm run dev:backend
+npm run dev
+```
+
+Open the Vite URL and use `/apps/portal/`, `/apps/admin/`, or `/apps/user/`.
+
+For production:
+
+```bash
+npm run build
+npm start
+```
+
+Set `MONGO_URI`, `ADMIN_PASSWORD`, `JWT_SECRET`, and `PORT` in the backend
+environment. Never commit `.env` files or database credentials.
+
 ## 🔑 Key Features
 
 ### 👤 Public Facing (Frontend)

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
-    "dev:backend": "npm --prefix backend run dev",
+    "dev:backend": "npm --prefix backend start",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend start",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
