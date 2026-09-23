@@ -12,6 +12,26 @@ const api = axios.create({
   },
 });
 
+const crudApi = axios.create({
+  baseURL: `${import.meta.env.VITE_API_URL || ""}/api`,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+crudApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // ======================================================
 // ADD TOKEN TO EVERY REQUEST
 // ======================================================
@@ -28,6 +48,26 @@ api.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+
+const getId = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "object") {
+    if (value._id) {
+      return String(value._id);
+    }
+
+    if (value.id) {
+      return String(value.id);
+    }
+
+    return null;
+  }
+
+  return String(value);
+};
 
 // ======================================================
 // APP
@@ -150,50 +190,54 @@ function App() {
   // ======================================================
 
   const assignedMinistryIds = useMemo(() => {
-    return (user?.ministries || []).map((id) =>
-      String(id)
-    );
-  }, [user]);
+  return (user?.ministries || [])
+    .map((ministry) => getId(ministry))
+    .filter(Boolean);
+}, [user]);
 
   // ======================================================
   // ALL ASSIGNED MINISTRIES
   // ======================================================
 
-  const assignedMinistries = useMemo(() => {
-    return ministries.filter((ministry) =>
-      assignedMinistryIds.includes(
-        String(ministry._id)
-      )
-    );
-  }, [ministries, assignedMinistryIds]);
+ const assignedMinistries = useMemo(() => {
+  return ministries.filter((ministry) =>
+    assignedMinistryIds.includes(
+      getId(ministry)
+    )
+  );
+}, [ministries, assignedMinistryIds]);
 
   // ======================================================
   // CHECK OWN MINISTRY
   // ======================================================
 
   const isOwnMinistry = (ministryId) => {
-    if (!ministryId) return false;
+  const normalizedId = getId(ministryId);
 
-    return assignedMinistryIds.includes(
-      String(ministryId)
-    );
-  };
+  if (!normalizedId) {
+    return false;
+  }
+
+  return assignedMinistryIds.includes(
+    normalizedId
+  );
+};
 
   // ======================================================
   // OWN DEPARTMENTS
   // ======================================================
 
-  const ownDepartments = useMemo(() => {
-    return departments.filter((department) => {
-      const ministryId =
-        department.ministry?._id ||
-        department.ministry;
+ const ownDepartments = useMemo(() => {
+  return departments.filter((department) => {
+    const ministryId = getId(
+      department.ministry
+    );
 
-      return isOwnMinistry(ministryId);
-    });
+    return isOwnMinistry(ministryId);
+  });
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departments, assignedMinistryIds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [departments, assignedMinistryIds]);
 
   // ======================================================
   // LOGOUT
@@ -206,37 +250,76 @@ function App() {
     window.location.href = COMMON_PORTAL;
   };
 
-  // ======================================================
-  // ADD DEPARTMENT
-  // ======================================================
+// ======================================================
+// ADD DEPARTMENT
+// ======================================================
 
-  const openAddDepartment = () => {
-    if (assignedMinistries.length === 0) {
-      alert(
-        "No ministry has been assigned to your account."
-      );
-      return;
-    }
-
-    setEditingDepartment(null);
-    setDepartmentName("");
-
-    // Default to the first assigned ministry
-    setSelectedDepartmentMinistryId(
-      String(assignedMinistries[0]._id)
+const openAddDepartment = () => {
+  if (assignedMinistries.length === 0) {
+    alert(
+      "No ministry has been assigned to your account."
     );
+    return;
+  }
 
-    setShowDepartmentModal(true);
-  };
+  setEditingDepartment(null);
+  setDepartmentName("");
 
-  // ======================================================
-  // EDIT DEPARTMENT
-  // ======================================================
+  setSelectedDepartmentMinistryId(
+    getId(assignedMinistries[0])
+  );
 
-  const openEditDepartment = (department) => {
-    const ministryId =
-      department.ministry?._id ||
-      department.ministry;
+  setShowDepartmentModal(true);
+};
+
+
+// ======================================================
+// EDIT DEPARTMENT
+// ======================================================
+
+const openEditDepartment = (department) => {
+  const ministryId = getId(
+    department.ministry
+  );
+
+  if (!isOwnMinistry(ministryId)) {
+    alert(
+      "You can only edit departments under your assigned ministries."
+    );
+    return;
+  }
+
+  setEditingDepartment(department);
+
+  setDepartmentName(
+    department.name || ""
+  );
+
+  setSelectedDepartmentMinistryId(
+    ministryId || ""
+  );
+
+  setShowDepartmentModal(true);
+};
+
+// ======================================================
+// SAVE / UPDATE DEPARTMENT
+// ======================================================
+
+const handleSaveDepartment = async (event) => {
+  event.preventDefault();
+
+  const trimmedName = departmentName.trim();
+
+  if (!trimmedName) {
+    alert("Please enter a department name.");
+    return;
+  }
+
+  let ministryId;
+
+  if (editingDepartment) {
+    ministryId = getId(editingDepartment.ministry);
 
     if (!isOwnMinistry(ministryId)) {
       alert(
@@ -244,178 +327,126 @@ function App() {
       );
       return;
     }
+  } else {
+    ministryId = selectedDepartmentMinistryId;
 
-    setEditingDepartment(department);
-    setDepartmentName(department.name || "");
-
-    setSelectedDepartmentMinistryId(
-      ministryId ? String(ministryId) : ""
-    );
-
-    setShowDepartmentModal(true);
-  };
-
-  // ======================================================
-  // SAVE DEPARTMENT
-  // ======================================================
-
-  const handleSaveDepartment = async (event) => {
-    event.preventDefault();
-
-    const trimmedName = departmentName.trim();
-
-    if (!trimmedName) {
-      alert("Please enter a department name.");
+    if (!ministryId) {
+      alert("Please select a ministry.");
       return;
     }
-
-    // ==================================================
-    // EDIT VALIDATION
-    // ==================================================
-
-    if (editingDepartment) {
-      const existingMinistryId =
-        editingDepartment.ministry?._id ||
-        editingDepartment.ministry;
-
-      if (!isOwnMinistry(existingMinistryId)) {
-        alert(
-          "You can only edit departments under your assigned ministries."
-        );
-        return;
-      }
-    }
-
-    // ==================================================
-    // ADD VALIDATION
-    // ==================================================
-
-    if (!editingDepartment) {
-      if (!selectedDepartmentMinistryId) {
-        alert("Please select a ministry.");
-        return;
-      }
-
-      if (
-        !isOwnMinistry(
-          selectedDepartmentMinistryId
-        )
-      ) {
-        alert(
-          "You can only add departments to your assigned ministries."
-        );
-        return;
-      }
-    }
-
-    try {
-      setSavingDepartment(true);
-
-      // ==================================================
-      // EDIT
-      // ==================================================
-
-      if (editingDepartment) {
-        const response = await api.patch(
-          `/departments/${editingDepartment._id}`,
-          {
-            name: trimmedName,
-          }
-        );
-
-        setDepartments((current) =>
-          current.map((department) =>
-            department._id ===
-            editingDepartment._id
-              ? response.data
-              : department
-          )
-        );
-      }
-
-      // ==================================================
-      // ADD
-      // ==================================================
-
-      else {
-        const response = await api.post(
-          "/departments",
-          {
-            name: trimmedName,
-            ministry:
-              selectedDepartmentMinistryId,
-          }
-        );
-
-        setDepartments((current) => [
-          ...current,
-          response.data,
-        ]);
-      }
-
-      closeDepartmentModal();
-    } catch (err) {
-      console.error(
-        "Failed to save department:",
-        err
-      );
-
-      alert(
-        err.response?.data?.message ||
-          "Failed to save department."
-      );
-    } finally {
-      setSavingDepartment(false);
-    }
-  };
-
-  // ======================================================
-  // DELETE DEPARTMENT
-  // ======================================================
-
-  const handleDeleteDepartment = async (
-    department
-  ) => {
-    const ministryId =
-      department.ministry?._id ||
-      department.ministry;
 
     if (!isOwnMinistry(ministryId)) {
       alert(
-        "You can only delete departments under your assigned ministries."
+        "You can only add departments to your assigned ministries."
       );
       return;
     }
+  }
 
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${department.name}"?`
-    );
+  try {
+    setSavingDepartment(true);
 
-    if (!confirmed) return;
-
-    try {
-      await api.delete(
-        `/departments/${department._id}`
+    if (editingDepartment) {
+      // EDIT
+      const response = await crudApi.patch(
+        `/departments/${editingDepartment._id}`,
+        {
+          name: trimmedName,
+          ministryId: ministryId,
+        }
       );
 
       setDepartments((current) =>
-        current.filter(
-          (item) =>
-            item._id !== department._id
+        current.map((department) =>
+          department._id === editingDepartment._id
+            ? response.data
+            : department
         )
       );
-    } catch (err) {
-      console.error(
-        "Failed to delete department:",
-        err
+    } else {
+      // ADD
+      const response = await crudApi.post(
+        "/departments",
+        {
+          name: trimmedName,
+          ministryId: ministryId,
+        }
       );
 
-      alert(
-        err.response?.data?.message ||
-          "Failed to delete department."
-      );
+      setDepartments((current) => [
+        ...current,
+        response.data,
+      ]);
     }
-  };
+
+    closeDepartmentModal();
+  } catch (err) {
+    console.error(
+      "Failed to save department:",
+      err
+    );
+
+    alert(
+      err.response?.data?.message ||
+        "Failed to save department."
+    );
+  } finally {
+    setSavingDepartment(false);
+  }
+};
+
+// ======================================================
+// DELETE DEPARTMENT
+// ======================================================
+
+const handleDeleteDepartment = async (
+  department
+) => {
+  const ministryId = getId(
+    department.ministry
+  );
+
+  if (!isOwnMinistry(ministryId)) {
+    alert(
+      "You can only delete departments under your assigned ministries."
+    );
+    return;
+  }
+
+  const confirmed =
+    window.confirm(
+      `Are you sure you want to delete "${department.name}"?`
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await crudApi.delete(
+  `/departments/${department._id}`
+);
+
+    setDepartments((current) =>
+      current.filter(
+        (item) =>
+          item._id !==
+          department._id
+      )
+    );
+
+  } catch (err) {
+    console.error(
+      "Failed to delete department:",
+      err
+    );
+
+    alert(
+      err.response?.data?.message ||
+        "Failed to delete department."
+    );
+  }
+};
 
   // ======================================================
   // CLOSE MODAL
