@@ -6,13 +6,18 @@
 }
 
 .sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 10;
   width: 276px;
+  height: 100vh;
   background: linear-gradient(180deg, #0b1730 0%, #122344 100%);
   color: #e2e8f0;
   padding: 28px 18px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  overflow-y: auto;
   box-shadow: 12px 0 30px rgba(15, 23, 42, 0.08);
 }
 
@@ -87,6 +92,25 @@
 
 .nav-item:hover {
   transform: translateX(3px);
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.logout-btn:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 
 .register-form {
@@ -367,8 +391,68 @@
 .main-panel {
   flex: 1;
   min-width: 0;
+  margin-left: 276px;
   padding: 36px clamp(20px, 4vw, 52px);
   overflow: hidden;
+}
+
+.report-selector {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin: 22px 0;
+  padding: 16px;
+  border: 1px solid #dbe7f4;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.report-selector label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.report-selector select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.report-selector button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.report-detail {
+  margin-bottom: 22px;
+  padding: 18px 0 4px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.report-department-list {
+  margin: 0;
+  padding-left: 24px;
+  color: #334155;
+  columns: 2;
+  column-gap: 42px;
+}
+
+.report-department-list li {
+  break-inside: avoid;
+  margin-bottom: 9px;
+}
+
+.empty-report {
+  margin: 0;
+  color: #64748b;
 }
 
 .admin-alert {
@@ -908,8 +992,16 @@ td {
   }
 
   .sidebar {
+    position: static;
+    inset: auto;
     width: 100%;
+    height: auto;
     padding: 20px;
+    overflow: visible;
+  }
+
+  .main-panel {
+    margin-left: 0;
   }
 
   .side-nav {
@@ -968,6 +1060,15 @@ td {
 
   .search-toolbar {
     flex-direction: column;
+  }
+
+  .report-selector {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .report-department-list {
+    columns: 1;
   }
 
   .search-toolbar select {

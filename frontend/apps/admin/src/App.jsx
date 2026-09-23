@@ -1,9 +1,23 @@
 import { useEffect, useState } from 'react'
+import { jsPDF } from 'jspdf'
 import './App.css'
 
 const API_BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api`.replace(/\/\/$/, '')
 
 const quickActions = ['Add Ministry', 'Add Department', 'Create User']
+
+const loadReportLogo = async () => {
+  const response = await fetch('/gov-logo.jpg')
+  if (!response.ok) throw new Error('Government logo could not be loaded')
+
+  const blob = await response.blob()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
 
 function App() {
   const [activeView, setActiveView] = useState('dashboard')
@@ -19,6 +33,7 @@ function App() {
   const [ministrySearch, setMinistrySearch] = useState('')
   const [departmentSearch, setDepartmentSearch] = useState('')
   const [departmentMinistryFilter, setDepartmentMinistryFilter] = useState('all')
+  const [reportMinistryId, setReportMinistryId] = useState('')
 
   const [registeredUsers, setRegisteredUsers] = useState([
     { name: 'Admin', role: 'Admin' },
@@ -39,6 +54,12 @@ function App() {
   const clearAdminMessage = () => {
     setMessage('')
     setMessageType('info')
+  }
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('adminAuthenticated')
+    sessionStorage.removeItem('adminUser')
+    window.location.href = '/apps/portal/'
   }
 
   useEffect(() => {
@@ -309,6 +330,312 @@ function App() {
 
     </>
   )
+
+  const renderReports = () => {
+    const activeUsers = registeredUsers.filter((user) => !user.isBlocked).length
+    const ministryRows = ministriesList.map((ministry) => {
+      const departmentCount = departmentsList.filter((department) => (
+        String(department.ministry?._id || department.ministry) === String(ministry.id)
+      )).length
+
+      return { ...ministry, departmentCount }
+    })
+    const selectedMinistry = ministriesList.find((ministry) => ministry.id === reportMinistryId)
+    const selectedDepartments = departmentsList.filter((department) => (
+      String(department.ministry?._id || department.ministry?.id || department.ministry || department.ministryId) === String(reportMinistryId)
+    ))
+
+    const downloadMinistryPdf = () => {
+      if (!selectedMinistry) return
+
+      const pdf = new jsPDF()
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      let y = 22
+
+      pdf.setFontSize(18)
+      pdf.text('Ministry and Departments Report', 20, y)
+      y += 12
+      pdf.setFontSize(13)
+      pdf.text(selectedMinistry.name, 20, y)
+      y += 10
+      pdf.setFontSize(10)
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, y)
+      y += 14
+      pdf.setDrawColor(203, 213, 225)
+      pdf.line(20, y, pageWidth - 20, y)
+      y += 12
+      pdf.setFontSize(11)
+      pdf.text(`Ministry: ${selectedMinistry.name}`, 20, y)
+      y += 8
+      pdf.text(`Total departments: ${selectedDepartments.length}`, 20, y)
+      y += 14
+
+      if (!selectedDepartments.length) {
+        pdf.setFontSize(11)
+        pdf.text('No departments have been added under this ministry.', 20, y)
+      } else {
+        selectedDepartments.forEach((department, index) => {
+          if (y > 270) {
+            pdf.addPage()
+            y = 22
+          }
+
+          pdf.setFontSize(11)
+          const lines = pdf.splitTextToSize(`${index + 1}. ${department.name}`, pageWidth - 40)
+          pdf.text(lines, 20, y)
+          y += 8 * lines.length + 3
+        })
+      }
+
+      pdf.save(`${selectedMinistry.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-departments.pdf`)
+    }
+
+    const downloadAllMinistriesPdf = async () => {
+      const pdf = new jsPDF()
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      let logoData
+
+      try {
+        logoData = await loadReportLogo()
+      } catch (error) {
+        console.error('Failed to load government logo for PDF:', error)
+      }
+
+      pdf.setFillColor(11, 23, 48)
+      pdf.rect(0, 0, pageWidth, 66, 'F')
+      if (logoData) {
+        pdf.addImage(logoData, 'JPEG', 20, 12, 24, 24)
+      }
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(19)
+      pdf.text('All Ministries', 54, 25)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(12)
+      pdf.text('Department Report', 54, 35)
+      pdf.setFontSize(9)
+      pdf.text(`Generated ${new Date().toLocaleString()}`, 54, 49)
+      pdf.setTextColor(15, 23, 42)
+      pdf.setDrawColor(56, 189, 248)
+      pdf.setLineWidth(1.2)
+      pdf.line(20, 78, pageWidth - 20, 78)
+      pdf.setLineWidth(0.2)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(10)
+      pdf.text(`${ministriesList.length} MINISTRIES`, 20, 96)
+      pdf.text(`${departmentsList.length} DEPARTMENTS`, 92, 96)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(9)
+      pdf.setTextColor(71, 85, 105)
+      pdf.text('Complete directory overview', 20, 105)
+      pdf.text('Grouped under each ministry', 92, 105)
+      pdf.setTextColor(15, 23, 42)
+      pdf.setDrawColor(203, 213, 225)
+      pdf.line(20, 120, pageWidth - 20, 120)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(12)
+      pdf.text('Ministries included', 20, 136)
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(71, 85, 105)
+      pdf.text('Each ministry is followed by its complete department list.', 20, 145)
+      pdf.setTextColor(15, 23, 42)
+
+      let summaryY = 158
+      ministryRows.forEach((ministry, index) => {
+        const summaryLines = pdf.splitTextToSize(
+          `${index + 1}. ${ministry.name} (${ministry.departmentCount} departments)`,
+          pageWidth - 40,
+        )
+
+        if (summaryY + summaryLines.length * 6 > 275) {
+          pdf.addPage()
+          summaryY = 22
+          pdf.setFont('helvetica', 'bold')
+          pdf.setFontSize(11)
+          pdf.text('Ministries included (continued):', 20, summaryY)
+          summaryY += 10
+        }
+
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(10)
+        pdf.text(summaryLines, 20, summaryY)
+        summaryY += summaryLines.length * 6 + 2
+      })
+
+      ministryRows.forEach((ministry, ministryIndex) => {
+        pdf.addPage()
+
+        const ministryDepartments = departmentsList.filter((department) => (
+          String(department.ministry?._id || department.ministry?.id || department.ministry || department.ministryId) === String(ministry.id)
+        ))
+        let y = 22
+
+        if (logoData) pdf.addImage(logoData, 'JPEG', 20, 10, 24, 24)
+
+        pdf.setTextColor(71, 85, 105)
+        pdf.setFontSize(11)
+        pdf.text(`Ministry ${ministryIndex + 1} of ${ministryRows.length}`, 52, y)
+        y += 11
+        pdf.setTextColor(15, 23, 42)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(18)
+        const ministryNameLines = pdf.splitTextToSize(ministry.name, pageWidth - 40)
+        pdf.text(`Ministry: ${ministryNameLines[0]}`, 52, y)
+        if (ministryNameLines.length > 1) pdf.text(ministryNameLines.slice(1), 52, y + 8)
+        y += 8 * ministryNameLines.length + 8
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(10)
+        pdf.setTextColor(71, 85, 105)
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, y)
+        y += 10
+        pdf.setTextColor(15, 23, 42)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(`All departments under this ministry: ${ministryDepartments.length}`, 20, y)
+        pdf.setFont('helvetica', 'normal')
+        y += 12
+        pdf.setDrawColor(203, 213, 225)
+        pdf.line(20, y, pageWidth - 20, y)
+        y += 12
+
+        if (!ministryDepartments.length) {
+          pdf.setFontSize(11)
+          pdf.text('No departments have been added under this ministry.', 20, y)
+          return
+        }
+
+        ministryDepartments.forEach((department, departmentIndex) => {
+          if (y > 270) {
+            pdf.addPage()
+            y = 22
+          }
+
+          pdf.setFontSize(11)
+          const lines = pdf.splitTextToSize(`${departmentIndex + 1}. ${department.name}`, pageWidth - 40)
+          pdf.text(lines, 20, y)
+          y += 8 * lines.length + 3
+        })
+      })
+
+      if (!ministryRows.length) {
+        pdf.setFontSize(18)
+        pdf.text('No ministries available.', 20, 22)
+      }
+
+      pdf.save(`all-ministries-departments-${new Date().toISOString().slice(0, 10)}.pdf`)
+    }
+
+    return (
+      <>
+        <header className="topbar">
+          <div>
+            <p className="eyebrow muted">Analytics</p>
+            <h1>Reports</h1>
+          </div>
+          <div className="header-actions">
+            <button className="primary-btn" type="button" onClick={downloadAllMinistriesPdf}>
+              Download All Ministries PDF
+            </button>
+            <button className="ghost-btn" type="button" onClick={() => setActiveView('dashboard')}>
+              Back to dashboard
+            </button>
+          </div>
+        </header>
+
+        <section className="stats-grid">
+          {[
+            { label: 'Total Ministries', value: ministriesList.length, change: 'Managed entries' },
+            { label: 'Total Departments', value: departmentsList.length, change: 'Across all ministries' },
+            { label: 'Active Users', value: activeUsers, change: 'Accounts with access' },
+            { label: 'Blocked Users', value: registeredUsers.length - activeUsers, change: 'Access restricted' },
+          ].map((item) => (
+            <article className="stat-card" key={item.label}>
+              <p>{item.label}</p>
+              <h3>{item.value}</h3>
+              <span>{item.change}</span>
+            </article>
+          ))}
+        </section>
+
+        <section className="panel table-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow muted">Directory coverage</p>
+              <h3>Departments by ministry</h3>
+            </div>
+          </div>
+
+          <div className="report-selector">
+            <label htmlFor="report-ministry">
+              <span>Select a ministry to view its departments</span>
+              <select
+                id="report-ministry"
+                value={reportMinistryId}
+                onChange={(event) => setReportMinistryId(event.target.value)}
+              >
+                <option value="">Select a ministry</option>
+                {ministriesList.map((ministry) => (
+                  <option key={ministry.id} value={ministry.id}>{ministry.name}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="primary-btn"
+              disabled={!selectedMinistry}
+              onClick={downloadMinistryPdf}
+            >
+              Download Ministry PDF
+            </button>
+          </div>
+
+          {selectedMinistry && (
+            <div className="report-detail">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow muted">Selected ministry</p>
+                  <h3>{selectedMinistry.name}</h3>
+                </div>
+                <span className="badge">{selectedDepartments.length} departments</span>
+              </div>
+              {selectedDepartments.length ? (
+                <ol className="report-department-list">
+                  {selectedDepartments.map((department) => <li key={department._id}>{department.name}</li>)}
+                </ol>
+              ) : <p className="empty-report">No departments have been added under this ministry.</p>}
+            </div>
+          )}
+
+          <table>
+            <thead>
+              <tr>
+                <th>Ministry</th>
+                <th>Departments</th>
+                <th>Coverage status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ministryRows.length ? ministryRows.map((ministry) => (
+                <tr key={ministry.id}>
+                  <td>{ministry.name}</td>
+                  <td>{ministry.departmentCount}</td>
+                  <td>
+                    <span className={`status ${ministry.departmentCount ? 'active' : 'pending'}`}>
+                      {ministry.departmentCount ? 'Covered' : 'Needs departments'}
+                    </span>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="3">No ministry data available yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+      </>
+    )
+  }
 
   const renderCreateUser = () => {
     const filteredUsers = registeredUsers.filter((user) => {
@@ -1002,7 +1329,7 @@ function App() {
           <div className="brand-mark">SL</div>
           <div>
             <p className="eyebrow">CMS</p>
-            <h2>Lanka Admin</h2>
+            <h2>Admin</h2>
           </div>
         </div>
 
@@ -1026,7 +1353,7 @@ function App() {
             className={`nav-item ${activeView === 'add-minister' ? 'active' : ''}`}
             onClick={() => setActiveView('add-minister')}
           >
-            Add Minister
+            Add Ministries
           </button>
           <button
             type="button"
@@ -1035,6 +1362,13 @@ function App() {
           >
             Add Department
           </button>
+          <button
+            type="button"
+            className={`nav-item ${activeView === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveView('reports')}
+          >
+            Reports
+          </button>
         </nav>
 
         <div className={`mini-card ${messageType === 'error' ? 'is-error' : messageType === 'success' ? 'is-success' : ''}`}>
@@ -1042,6 +1376,10 @@ function App() {
           <strong>Admin access protected</strong>
           <small>{message}</small>
         </div>
+
+        <button type="button" className="logout-btn" onClick={handleLogout}>
+          Log out
+        </button>
       </aside>
 
       <main className="main-panel">
@@ -1057,6 +1395,7 @@ function App() {
           </div>
         )}
         {activeView === 'dashboard' && renderDashboard()}
+        {activeView === 'reports' && renderReports()}
         {activeView === 'create-user' && renderCreateUser()}
         {activeView === 'add-minister' && renderMinisterPage()}
         {activeView === 'add-department' && renderDepartmentPage()}
