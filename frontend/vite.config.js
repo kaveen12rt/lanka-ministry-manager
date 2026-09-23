@@ -15,6 +15,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        root: resolve(rootDir, 'index.html'),
         portal: resolve(rootDir, 'apps/portal/index.html'),
         admin: resolve(rootDir, 'apps/admin/index.html'),
         user: resolve(rootDir, 'apps/user/index.html'),
