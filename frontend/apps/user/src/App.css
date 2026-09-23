@@ -151,6 +151,62 @@ button:disabled {
     background: rgba(255, 255, 255, 0.1);
 }
 
+/* =========================================================
+   ALERTS
+========================================================= */
+
+.admin-alert {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    padding: 13px 16px;
+    margin-bottom: 22px;
+    border: 1px solid #d5dce5;
+    background: #f5f7fa;
+    color: #344054;
+    font-size: 13px;
+}
+
+.admin-alert.error-alert {
+    background: #fce8e8;
+    color: #8f2424;
+    border-color: #edb8b8;
+}
+
+.admin-alert.success-alert {
+    background: #eaf6ee;
+    color: #27613a;
+    border-color: #b9dcc4;
+}
+
+.alert-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.alert-content strong {
+    font-weight: 700;
+}
+
+.alert-content span {
+    line-height: 1.4;
+}
+
+.alert-close {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 20px;
+    line-height: 1;
+    padding: 2px 5px;
+    flex-shrink: 0;
+}
+
+.alert-close:hover {
+    opacity: 0.7;
+}
 
 /* =========================================================
    MAIN LAYOUT

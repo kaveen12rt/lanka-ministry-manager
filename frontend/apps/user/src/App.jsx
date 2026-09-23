@@ -84,6 +84,19 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [message, setMessage] = useState("");
+const [messageType, setMessageType] = useState("info");
+
+const setUserMessage = (text, type = "info") => {
+  setMessage(text || "Something went wrong.");
+  setMessageType(type);
+};
+
+const clearUserMessage = () => {
+  setMessage("");
+  setMessageType("info");
+};
+
   const [showDepartmentModal, setShowDepartmentModal] =
     useState(false);
 
@@ -97,6 +110,18 @@ function App() {
 
   const [savingDepartment, setSavingDepartment] =
     useState(false);
+
+   useEffect(() => {
+  if (!message || messageType !== "success") {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    clearUserMessage();
+  }, 3000);
+
+  return () => clearTimeout(timer);
+}, [message, messageType]);
 
   // ======================================================
   // LOAD AND VALIDATE USER
@@ -256,9 +281,10 @@ function App() {
 
 const openAddDepartment = () => {
   if (assignedMinistries.length === 0) {
-    alert(
-      "No ministry has been assigned to your account."
-    );
+   setUserMessage(
+  "No ministry has been assigned to your account.",
+  "error"
+);
     return;
   }
 
@@ -283,9 +309,10 @@ const openEditDepartment = (department) => {
   );
 
   if (!isOwnMinistry(ministryId)) {
-    alert(
-      "You can only edit departments under your assigned ministries."
-    );
+   setUserMessage(
+  "You can only edit departments under your assigned ministries.",
+  "error"
+);
     return;
   }
 
@@ -312,7 +339,10 @@ const handleSaveDepartment = async (event) => {
   const trimmedName = departmentName.trim();
 
   if (!trimmedName) {
-    alert("Please enter a department name.");
+    setUserMessage(
+  "Please enter a department name.",
+  "error"
+);
     return;
   }
 
@@ -321,24 +351,29 @@ const handleSaveDepartment = async (event) => {
   if (editingDepartment) {
     ministryId = getId(editingDepartment.ministry);
 
-    if (!isOwnMinistry(ministryId)) {
-      alert(
-        "You can only edit departments under your assigned ministries."
-      );
-      return;
-    }
+   if (!isOwnMinistry(ministryId)) {
+  setUserMessage(
+    "You can only edit departments under your assigned ministries.",
+    "error"
+  );
+  return;
+}
   } else {
     ministryId = selectedDepartmentMinistryId;
 
     if (!ministryId) {
-      alert("Please select a ministry.");
+    setUserMessage(
+  "Please select a ministry.",
+  "error"
+);
       return;
     }
 
     if (!isOwnMinistry(ministryId)) {
-      alert(
-        "You can only add departments to your assigned ministries."
-      );
+      setUserMessage(
+  "You can only add departments to your assigned ministries.",
+  "error"
+);
       return;
     }
   }
@@ -379,17 +414,25 @@ const handleSaveDepartment = async (event) => {
       ]);
     }
 
-    closeDepartmentModal();
+    setUserMessage(
+  editingDepartment
+    ? `Department "${trimmedName}" updated successfully.`
+    : `Department "${trimmedName}" added successfully.`,
+  "success"
+);
+
+closeDepartmentModal();
   } catch (err) {
     console.error(
       "Failed to save department:",
       err
     );
 
-    alert(
-      err.response?.data?.message ||
-        "Failed to save department."
-    );
+    setUserMessage(
+  err.response?.data?.message ||
+    "Failed to save department.",
+  "error"
+);
   } finally {
     setSavingDepartment(false);
   }
@@ -399,24 +442,22 @@ const handleSaveDepartment = async (event) => {
 // DELETE DEPARTMENT
 // ======================================================
 
-const handleDeleteDepartment = async (
-  department
-) => {
+const handleDeleteDepartment = async (department) => {
   const ministryId = getId(
     department.ministry
   );
 
   if (!isOwnMinistry(ministryId)) {
-    alert(
-      "You can only delete departments under your assigned ministries."
+    setUserMessage(
+      "You can only delete departments under your assigned ministries.",
+      "error"
     );
     return;
   }
 
-  const confirmed =
-    window.confirm(
-      `Are you sure you want to delete "${department.name}"?`
-    );
+  const confirmed = window.confirm(
+    `Are you sure you want to delete "${department.name}"?`
+  );
 
   if (!confirmed) {
     return;
@@ -424,26 +465,29 @@ const handleDeleteDepartment = async (
 
   try {
     await crudApi.delete(
-  `/departments/${department._id}`
-);
+      `/departments/${department._id}`
+    );
 
     setDepartments((current) =>
       current.filter(
-        (item) =>
-          item._id !==
-          department._id
+        (item) => item._id !== department._id
       )
     );
 
+    setUserMessage(
+      `Department "${department.name}" deleted successfully.`,
+      "success"
+    );
   } catch (err) {
     console.error(
       "Failed to delete department:",
       err
     );
 
-    alert(
+    setUserMessage(
       err.response?.data?.message ||
-        "Failed to delete department."
+        "Failed to delete department.",
+      "error"
     );
   }
 };
@@ -614,6 +658,39 @@ const handleDeleteDepartment = async (
         ================================================== */}
 
         <main className="content">
+            {message && (
+  <div
+    className={`admin-alert ${
+      messageType === "error"
+        ? "error-alert"
+        : messageType === "success"
+        ? "success-alert"
+        : ""
+    }`}
+    role="alert"
+  >
+    <div className="alert-content">
+      <strong>
+        {messageType === "error"
+          ? "Form error"
+          : messageType === "success"
+          ? "Success"
+          : "Information"}
+      </strong>
+
+      <span>{message}</span>
+    </div>
+
+    <button
+      type="button"
+      className="alert-close"
+      onClick={clearUserMessage}
+      aria-label="Close alert"
+    >
+      ×
+    </button>
+  </div>
+)}
 
           {/* ==================================================
               ERROR
