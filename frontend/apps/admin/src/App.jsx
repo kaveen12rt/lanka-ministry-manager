@@ -21,8 +21,8 @@ const loadReportLogo = async () => {
 
 function App() {
   const [activeView, setActiveView] = useState('dashboard')
-  const [ministerForm, setMinisterForm] = useState({ name: '', description: '' })
-  const [editingMinisterId, setEditingMinisterId] = useState(null)
+  const [MinistryForm, setMinistryForm] = useState({ name: '', description: '' })
+  const [editingMinistryId, setEditingMinistryId] = useState(null)
   const [ministriesList, setMinistriesList] = useState([])
   const [departmentForm, setDepartmentForm] = useState({ name: '', ministryId: '' })
   const [departmentNames, setDepartmentNames] = useState([''])
@@ -269,7 +269,7 @@ function App() {
                 key={action}
                 className="action-btn"
                 type="button"
-                onClick={() => setActiveView(action === 'Add Ministry' ? 'add-minister' : action === 'Add Department' ? 'add-department' : 'create-user')}
+                onClick={() => setActiveView(action === 'Add Ministry' ? 'add-Ministry' : action === 'Add Department' ? 'add-department' : 'create-user')}
               >
                 {action}
               </button>
@@ -294,7 +294,7 @@ function App() {
       <section className="panel table-panel">
         <div className="panel-header">
           <h3>Ministry summary</h3>
-          <button className="link-btn" type="button" onClick={() => setActiveView('add-minister')}>Manage</button>
+          <button className="link-btn" type="button" onClick={() => setActiveView('add-Ministry')}>Manage</button>
         </div>
 
         <table>
@@ -864,22 +864,22 @@ function App() {
     )
   }
 
-  const handleMinisterSubmit = async (event) => {
+  const handleMinistrySubmit = async (event) => {
     event.preventDefault()
 
-    const name = ministerForm.name.trim()
+    const name = MinistryForm.name.trim()
 
     if (!name) {
-      setAdminMessage('Please enter the minister name.', 'error')
+      setAdminMessage('Please enter the Ministry name.', 'error')
       return
     }
 
     try {
-      const endpoint = editingMinisterId
-        ? `${API_BASE_URL}/ministries/${editingMinisterId}`
+      const endpoint = editingMinistryId
+        ? `${API_BASE_URL}/ministries/${editingMinistryId}`
         : `${API_BASE_URL}/ministries`
       const response = await fetch(endpoint, {
-        method: editingMinisterId ? 'PATCH' : 'POST',
+        method: editingMinistryId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
@@ -889,24 +889,24 @@ function App() {
 
       const savedMinistry = { ...result, id: result._id }
       setMinistriesList((current) =>
-        editingMinisterId
-          ? current.map((minister) => (minister.id === editingMinisterId ? savedMinistry : minister))
+        editingMinistryId
+          ? current.map((Ministry) => (Ministry.id === editingMinistryId ? savedMinistry : Ministry))
           : [savedMinistry, ...current],
       )
-      setAdminMessage(`Minister "${name}" ${editingMinisterId ? 'updated' : 'added'} successfully.`, 'success')
-      setMinisterForm({ name: '', description: '' })
-      setEditingMinisterId(null)
+      setAdminMessage(`Ministry "${name}" ${editingMinistryId ? 'updated' : 'added'} successfully.`, 'success')
+      setMinistryForm({ name: '', description: '' })
+      setEditingMinistryId(null)
     } catch (error) {
       setAdminMessage(error?.message || 'Ministry save failed', 'error')
     }
   }
 
-  const handleEditMinister = (minister) => {
-    setEditingMinisterId(minister.id)
-    setMinisterForm({ name: minister.name, description: minister.description })
+  const handleEditMinistry = (Ministry) => {
+    setEditingMinistryId(Ministry.id)
+    setMinistryForm({ name: Ministry.name, description: Ministry.description })
   }
 
-  const handleDeleteMinister = async (id) => {
+  const handleDeleteMinistry = async (id) => {
     const ministry = ministriesList.find((item) => item.id === id)
     const shouldDelete = window.confirm(`Delete ministry "${ministry?.name || 'this ministry'}"?`)
     if (!shouldDelete) return
@@ -916,16 +916,16 @@ function App() {
       const result = await response.json()
       if (!response.ok) throw new Error(result.message || 'Ministry delete failed')
 
-      setMinistriesList((current) => current.filter((minister) => minister.id !== id))
-      setAdminMessage('Minister deleted successfully.', 'success')
+      setMinistriesList((current) => current.filter((Ministry) => Ministry.id !== id))
+      setAdminMessage('Ministry deleted successfully.', 'success')
     } catch (error) {
       setAdminMessage(error?.message || 'Ministry delete failed', 'error')
     }
   }
 
-  const renderMinisterPage = () => {
-    const filteredMinistries = ministriesList.filter((minister) =>
-      minister.name.toLowerCase().includes(ministrySearch.trim().toLowerCase()),
+  const renderMinistryPage = () => {
+    const filteredMinistries = ministriesList.filter((Ministry) =>
+      Ministry.name.toLowerCase().includes(ministrySearch.trim().toLowerCase()),
     )
 
     return (
@@ -933,7 +933,7 @@ function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow muted">Ministry</p>
-          <h1>{editingMinisterId ? 'Edit Minister' : 'Add Minister'}</h1>
+          <h1>{editingMinistryId ? 'Edit Ministry' : 'Add Ministry'}</h1>
         </div>
 
         <div className="header-actions">
@@ -945,29 +945,29 @@ function App() {
 
       <section className="panel user-panel">
         <div className="panel-header">
-          <h3>{editingMinisterId ? 'Update minister details' : 'Create a new minister entry'}</h3>
+          <h3>{editingMinistryId ? 'Update Ministry details' : 'Create a new Ministry entry'}</h3>
         </div>
 
-        <form className="register-form dedicated-form" onSubmit={handleMinisterSubmit}>
+        <form className="register-form dedicated-form" onSubmit={handleMinistrySubmit}>
           <label>
-            <span>Minister Name</span>
+            <span>Ministry Name</span>
             <input
               type="text"
-              value={ministerForm.name}
-              onChange={(event) => setMinisterForm({ ...ministerForm, name: event.target.value })}
-              placeholder="e.g. Minister of Education"
+              value={MinistryForm.name}
+              onChange={(event) => setMinistryForm({ ...MinistryForm, name: event.target.value })}
+              placeholder="e.g. Ministry of Education"
             />
           </label>
 
           <button type="submit" className="primary-btn full-width">
-            {editingMinisterId ? 'Update Minister' : 'Add Minister'}
+            {editingMinistryId ? 'Update Ministry' : 'Add Ministry'}
           </button>
         </form>
       </section>
 
       <section className="panel table-panel">
         <div className="panel-header">
-          <h3>Minister List</h3>
+          <h3>Ministry List</h3>
         </div>
 
         <div className="search-toolbar">
@@ -989,21 +989,21 @@ function App() {
           </thead>
           <tbody>
             {filteredMinistries.length ? (
-              filteredMinistries.map((minister) => (
-                <tr key={minister.id}>
-                  <td>{minister.name}</td>
+              filteredMinistries.map((Ministry) => (
+                <tr key={Ministry.id}>
+                  <td>{Ministry.name}</td>
                   <td className="action-cell">
                     <button
                       type="button"
                       className="small-btn edit-btn"
-                      onClick={() => handleEditMinister(minister)}
+                      onClick={() => handleEditMinistry(Ministry)}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       className="small-btn delete-btn"
-                      onClick={() => handleDeleteMinister(minister.id)}
+                      onClick={() => handleDeleteMinistry(Ministry.id)}
                     >
                       Delete
                     </button>
@@ -1012,16 +1012,16 @@ function App() {
               ))
             ) : (
               <tr>
-                <td colSpan="2">No ministers added yet.</td>
+                <td colSpan="2">No Ministrys added yet.</td>
               </tr>
             )}
           </tbody>
         </table>
       </section>
 
-      {editingMinisterId && (
+      {editingMinistryId && (
         <div className="user-edit-overlay" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setEditingMinisterId(null)
+          if (event.target === event.currentTarget) setEditingMinistryId(null)
         }}>
           <section className="user-edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-ministry-title">
             <div className="modal-header">
@@ -1029,19 +1029,19 @@ function App() {
                 <p className="eyebrow muted">Ministry management</p>
                 <h2 id="edit-ministry-title">Edit Ministry</h2>
               </div>
-              <button type="button" className="modal-close" onClick={() => setEditingMinisterId(null)} aria-label="Close edit ministry form">×</button>
+              <button type="button" className="modal-close" onClick={() => setEditingMinistryId(null)} aria-label="Close edit ministry form">×</button>
             </div>
-            <form className="modal-form" onSubmit={handleMinisterSubmit}>
+            <form className="modal-form" onSubmit={handleMinistrySubmit}>
               <label>
                 <span>Ministry Name</span>
                 <input
-                  value={ministerForm.name}
-                  onChange={(event) => setMinisterForm({ ...ministerForm, name: event.target.value })}
+                  value={MinistryForm.name}
+                  onChange={(event) => setMinistryForm({ ...MinistryForm, name: event.target.value })}
                   autoFocus
                 />
               </label>
               <div className="modal-actions">
-                <button type="button" className="ghost-btn" onClick={() => setEditingMinisterId(null)}>Cancel</button>
+                <button type="button" className="ghost-btn" onClick={() => setEditingMinistryId(null)}>Cancel</button>
                 <button type="submit" className="primary-btn">Save Changes</button>
               </div>
             </form>
@@ -1170,7 +1170,7 @@ function App() {
           {!ministriesList.length && (
             <div className="form-notice">
               <span>Add a ministry first before creating departments.</span>
-              <button type="button" className="link-btn" onClick={() => setActiveView('add-minister')}>
+              <button type="button" className="link-btn" onClick={() => setActiveView('add-Ministry')}>
                 Add Ministry
               </button>
             </div>
@@ -1350,8 +1350,8 @@ function App() {
           </button>
           <button
             type="button"
-            className={`nav-item ${activeView === 'add-minister' ? 'active' : ''}`}
-            onClick={() => setActiveView('add-minister')}
+            className={`nav-item ${activeView === 'add-Ministry' ? 'active' : ''}`}
+            onClick={() => setActiveView('add-Ministry')}
           >
             Add Ministries
           </button>
@@ -1397,7 +1397,7 @@ function App() {
         {activeView === 'dashboard' && renderDashboard()}
         {activeView === 'reports' && renderReports()}
         {activeView === 'create-user' && renderCreateUser()}
-        {activeView === 'add-minister' && renderMinisterPage()}
+        {activeView === 'add-Ministry' && renderMinistryPage()}
         {activeView === 'add-department' && renderDepartmentPage()}
       </main>
     </div>
