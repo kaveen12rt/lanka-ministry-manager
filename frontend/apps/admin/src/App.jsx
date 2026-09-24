@@ -356,17 +356,19 @@ function App() {
       pdf.text('Ministry and Departments Report', 20, y)
       y += 12
       pdf.setFontSize(13)
-      pdf.text(selectedMinistry.name, 20, y)
-      y += 10
+      const selectedMinistryNameLines = pdf.splitTextToSize(selectedMinistry.name, pageWidth - 40)
+      pdf.text(selectedMinistryNameLines, 20, y)
+      y += 8 * selectedMinistryNameLines.length + 2
       pdf.setFontSize(10)
       pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, y)
-      y += 14
+      y += 12
       pdf.setDrawColor(203, 213, 225)
       pdf.line(20, y, pageWidth - 20, y)
       y += 12
       pdf.setFontSize(11)
-      pdf.text(`Ministry: ${selectedMinistry.name}`, 20, y)
-      y += 8
+      const selectedMinistryLabelLines = pdf.splitTextToSize(`Ministry: ${selectedMinistry.name}`, pageWidth - 40)
+      pdf.text(selectedMinistryLabelLines, 20, y)
+      y += 8 * selectedMinistryLabelLines.length
       pdf.text(`Total departments: ${selectedDepartments.length}`, 20, y)
       y += 14
 
@@ -480,9 +482,8 @@ function App() {
         pdf.setTextColor(15, 23, 42)
         pdf.setFont('helvetica', 'bold')
         pdf.setFontSize(18)
-        const ministryNameLines = pdf.splitTextToSize(ministry.name, pageWidth - 40)
-        pdf.text(`Ministry: ${ministryNameLines[0]}`, 52, y)
-        if (ministryNameLines.length > 1) pdf.text(ministryNameLines.slice(1), 52, y + 8)
+        const ministryNameLines = pdf.splitTextToSize(`Ministry: ${ministry.name}`, pageWidth - 72)
+        pdf.text(ministryNameLines, 52, y)
         y += 8 * ministryNameLines.length + 8
         pdf.setFont('helvetica', 'normal')
         pdf.setFontSize(10)
