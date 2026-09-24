@@ -1,0 +1,35 @@
+{
+  "name": "lanka-ministry-manager",
+  "version": "1.0.0",
+  "description": "A full-stack web application (MERN) to manage and browse the directory of Sri Lankan Government Ministries, Departments, and Public Corporations.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend start",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kaveen12rt/lanka-ministry-manager.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kaveen12rt/lanka-ministry-manager/issues"
+  },
+  "homepage": "https://github.com/kaveen12rt/lanka-ministry-manager#readme",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.3",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.10.1",
+    "vite": "^8.3.0"
+  }
+}
