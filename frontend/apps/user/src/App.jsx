@@ -96,6 +96,11 @@ const [ministrySearch, setMinistrySearch] = useState("");
 const [departmentVisibleCounts, setDepartmentVisibleCounts] =
   useState({});
 
+  const [departmentSearch, setDepartmentSearch] = useState("");
+
+const [departmentTableVisibleCount, setDepartmentTableVisibleCount] =
+  useState(10);
+
 const clearUserMessage = () => {
   setMessage("");
   setMessageType("info");
@@ -284,6 +289,38 @@ const showLessDepartments = (ministryId) => {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [departments, assignedMinistryIds]);
+
+const filteredOwnDepartments = useMemo(() => {
+  const search = departmentSearch.trim().toLowerCase();
+
+  if (!search) {
+    return ownDepartments;
+  }
+
+  return ownDepartments.filter((department) => {
+    const departmentName =
+      department.name?.toLowerCase() || "";
+
+    const departmentMinistryId =
+      department.ministry?._id ||
+      department.ministry;
+
+    const departmentMinistry =
+      ministries.find(
+        (ministry) =>
+          String(ministry._id) ===
+          String(departmentMinistryId)
+      );
+
+    const ministryName =
+      departmentMinistry?.name?.toLowerCase() || "";
+
+    return (
+      departmentName.includes(search) ||
+      ministryName.includes(search)
+    );
+  });
+}, [ownDepartments, ministries, departmentSearch]);
 
 const filteredMinistries = useMemo(() => {
   const search = ministrySearch.trim().toLowerCase();
@@ -1383,6 +1420,32 @@ const visibleDepartments = search && matchingDepartments.length > 0
 
                       </div>
 
+                      <div className="department-table-search">
+  <input
+    type="text"
+    placeholder="Search departments or ministries..."
+    value={departmentSearch}
+    onChange={(event) => {
+      setDepartmentSearch(event.target.value);
+      setDepartmentTableVisibleCount(10);
+    }}
+  />
+
+  {departmentSearch && (
+    <button
+      type="button"
+      className="search-clear-button"
+      onClick={() => {
+        setDepartmentSearch("");
+        setDepartmentTableVisibleCount(10);
+      }}
+      aria-label="Clear search"
+    >
+      ×
+    </button>
+  )}
+</div>
+
                       <div className="table-container">
 
                         <table>
@@ -1409,10 +1472,22 @@ const visibleDepartments = search && matchingDepartments.length > 0
                             </tr>
                           </thead>
 
-                          <tbody>
+                         <tbody>
 
-                            {ownDepartments.map(
-                              (department) => {
+  {filteredOwnDepartments.length === 0 ? (
+    <tr>
+      <td colSpan="4">
+        <div className="table-empty-message">
+          {departmentSearch
+            ? "No departments or ministries match your search."
+            : "No departments found."}
+        </div>
+      </td>
+    </tr>
+  ) : (
+    filteredOwnDepartments
+      .slice(0, departmentTableVisibleCount)
+      .map((department) => {
 
                                 const departmentMinistryId =
                                   department.ministry?._id ||
@@ -1502,12 +1577,53 @@ const visibleDepartments = search && matchingDepartments.length > 0
 
                                   </tr>
                                 );
-                              }
+                              })
                             )}
+                          
 
                           </tbody>
 
                         </table>
+                        {filteredOwnDepartments.length > 10 && (
+  <div className="department-pagination">
+
+    {departmentTableVisibleCount <
+    filteredOwnDepartments.length ? (
+      <button
+        className="show-more-button"
+        onClick={() =>
+          setDepartmentTableVisibleCount(
+            (current) =>
+              Math.min(
+                current + 10,
+                filteredOwnDepartments.length
+              )
+          )
+        }
+      >
+        Show More
+        <span>
+          +
+          {Math.min(
+            10,
+            filteredOwnDepartments.length -
+              departmentTableVisibleCount
+          )}
+        </span>
+      </button>
+    ) : (
+      <button
+        className="show-more-button"
+        onClick={() =>
+          setDepartmentTableVisibleCount(10)
+        }
+      >
+        Show Less
+      </button>
+    )}
+
+  </div>
+)}
 
                       </div>
 

@@ -50,6 +50,37 @@ npm start
 Set `MONGO_URI`, `ADMIN_PASSWORD`, `JWT_SECRET`, and `PORT` in the backend
 environment. Never commit `.env` files or database credentials.
 
+## Deploy with Vercel and Render
+
+Deploy the two folders as separate services:
+
+### Render backend
+
+- Create a **Web Service** from this repository.
+- Set **Root Directory** to `backend`.
+- Build command: `npm install`.
+- Start command: `npm start`.
+- Add `MONGO_URI`, `ADMIN_PASSWORD`, and `JWT_SECRET` under Environment Variables.
+- Add the Render service URL as the frontend API URL, for example:
+	`https://ministry-manager-86gd.onrender.com`.
+- Confirm `https://ministry-manager-86gd.onrender.com/api/health` returns
+	`"status":"ok"`.
+
+### Vercel frontend
+
+- Import the same repository as a separate Vercel project.
+- Set **Root Directory** to `frontend`.
+- Build command: `npm run build`.
+- Output directory: `dist`.
+- Add this Environment Variable for **Production** and **Preview**:
+
+```text
+VITE_API_URL=https://ministry-manager-86gd.onrender.com
+```
+
+Redeploy Vercel after adding or changing `VITE_API_URL`. Vite embeds this value
+at build time; changing it without a new deployment will not update the app.
+
 ## 🔑 Key Features
 
 ### 👤 Public Facing (Frontend)
