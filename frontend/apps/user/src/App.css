@@ -200,6 +200,58 @@ button:disabled {
     background: #fafbfd;
 }
 
+.department-table-search {
+    position: relative;
+    margin: 0 24px 18px;
+}
+
+.department-table-search input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 13px 44px 13px 15px;
+    border: 1px solid #d8dee8;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #1f2937;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.department-table-search input:focus {
+    border-color: #123b6d;
+    box-shadow: 0 0 0 3px rgba(18, 59, 109, 0.08);
+}
+
+.department-table-search input::placeholder {
+    color: #9aa4b2;
+}
+
+.department-table-search .search-clear-button {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    font-size: 21px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 7px;
+}
+
+.department-table-search .search-clear-button:hover {
+    color: #123b6d;
+}
+
+.table-empty-message {
+    text-align: center;
+    padding: 35px 20px;
+    color: #8993a0;
+    font-size: 13px;
+}
+
 .show-more-button {
     width: 100%;
     padding: 11px 20px;
