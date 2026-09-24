@@ -91,6 +91,10 @@ const setUserMessage = (text, type = "info") => {
   setMessage(text || "Something went wrong.");
   setMessageType(type);
 };
+const [ministrySearch, setMinistrySearch] = useState("");
+
+const [departmentVisibleCounts, setDepartmentVisibleCounts] =
+  useState({});
 
 const clearUserMessage = () => {
   setMessage("");
@@ -210,6 +214,23 @@ const clearUserMessage = () => {
     }
   };
 
+  const showMoreDepartments = (ministryId, total) => {
+  setDepartmentVisibleCounts((current) => ({
+    ...current,
+    [ministryId]: Math.min(
+      (current[ministryId] || 3) + 5,
+      total
+    ),
+  }));
+};
+
+const showLessDepartments = (ministryId) => {
+  setDepartmentVisibleCounts((current) => ({
+    ...current,
+    [ministryId]: 3,
+  }));
+};
+
   // ======================================================
   // ALL ASSIGNED MINISTRY IDS
   // ======================================================
@@ -264,6 +285,37 @@ const clearUserMessage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [departments, assignedMinistryIds]);
 
+const filteredMinistries = useMemo(() => {
+  const search = ministrySearch.trim().toLowerCase();
+
+  if (!search) {
+    return ministries;
+  }
+
+  return ministries.filter((ministry) => {
+    const ministryMatches =
+      ministry.name?.toLowerCase().includes(search);
+
+    const ministryDepartments = departments.filter(
+      (department) => {
+        const departmentMinistryId =
+          getId(department.ministry);
+
+        return (
+          String(departmentMinistryId) ===
+          String(ministry._id)
+        );
+      }
+    );
+
+    const departmentMatches =
+      ministryDepartments.some((department) =>
+        department.name?.toLowerCase().includes(search)
+      );
+
+    return ministryMatches || departmentMatches;
+  });
+}, [ministries, departments, ministrySearch]);
   // ======================================================
   // LOGOUT
   // ======================================================
@@ -942,162 +994,244 @@ const handleDeleteDepartment = async (department) => {
                 </div>
               )}
 
+              <div className="directory-search">
+  <input
+    type="text"
+    placeholder="Search ministries or departments..."
+    value={ministrySearch}
+    onChange={(event) =>
+      setMinistrySearch(event.target.value)
+    }
+  />
+
+  {ministrySearch && (
+    <button
+      type="button"
+      className="search-clear-button"
+      onClick={() => setMinistrySearch("")}
+      aria-label="Clear search"
+    >
+      ×
+    </button>
+  )}
+</div>
+
               <div className="ministry-grid">
 
-                {ministries.length === 0 ? (
-                  <div className="empty-state">
-                    No ministries found.
+                {filteredMinistries.length === 0 ? (
+  <div className="empty-state">
+    {ministrySearch
+      ? "No ministries or departments match your search."
+      : "No ministries found."}
+  </div>
+) : (
+  filteredMinistries.map((ministry) => {
+    const ministryDepartments = departments.filter(
+      (department) => {
+        const departmentMinistryId =
+          getId(department.ministry);
+
+        return (
+          String(departmentMinistryId) ===
+          String(ministry._id)
+        );
+      }
+    );
+
+    const canManage = isOwnMinistry(ministry._id);
+
+    const visibleCount =
+      departmentVisibleCounts[ministry._id] || 3;
+
+    const search = ministrySearch.trim().toLowerCase();
+
+    /*
+     * When searching for a department, make sure the
+     * matching department is visible even if it is
+     * beyond the first 3 departments.
+     */
+    const ministryMatchesSearch =
+  search && ministry.name?.toLowerCase().includes(search);
+
+const matchingDepartments = search
+  ? ministryDepartments.filter((department) =>
+      department.name?.toLowerCase().includes(search)
+    )
+  : [];
+
+const visibleDepartments = search && matchingDepartments.length > 0
+  ? [
+      ...matchingDepartments,
+      ...ministryDepartments.filter(
+        (department) =>
+          !matchingDepartments.some(
+            (matched) => matched._id === department._id
+          )
+      ),
+    ].slice(
+      0,
+      Math.max(visibleCount, matchingDepartments.length)
+    )
+  : ministryDepartments.slice(0, visibleCount);
+    return (
+      <div
+        className={
+          canManage
+            ? "ministry-card own"
+            : "ministry-card"
+        }
+        key={ministry._id}
+      >
+
+        <div className="ministry-card-header">
+
+          <div className="ministry-title">
+
+            <div className="ministry-icon">
+              M
+            </div>
+
+            <div>
+              <h3>{ministry.name}</h3>
+
+              {canManage && (
+                <span className="assigned-label">
+                  Your Ministry
+                </span>
+              )}
+            </div>
+
+          </div>
+
+          <span className="department-count">
+            {ministryDepartments.length}
+          </span>
+
+        </div>
+
+        <div className="department-heading">
+          <span>Departments</span>
+
+          <span>
+            {ministryDepartments.length}
+          </span>
+        </div>
+
+        <div className="department-list">
+
+          {ministryDepartments.length === 0 ? (
+            <p className="empty-text">
+              No departments registered.
+            </p>
+          ) : (
+            <>
+              {visibleDepartments.map((department) => (
+                <div
+                  className="department-row"
+                  key={department._id}
+                >
+
+                  <div className="department-name">
+
+                    <span className="department-dot" />
+
+                    <span>
+                      {department.name}
+                    </span>
+
                   </div>
-                ) : (
-                  ministries.map((ministry) => {
 
-                    const ministryDepartments =
-                      departments.filter(
-                        (department) => {
-                          const departmentMinistryId =
-                            department.ministry?._id ||
-                            department.ministry;
+                  {canManage && (
+                    <div className="row-actions">
 
-                          return (
-                            String(
-                              departmentMinistryId
-                            ) ===
-                            String(ministry._id)
-                          );
+                      <button
+                        className="edit-button"
+                        onClick={() =>
+                          openEditDepartment(
+                            department
+                          )
                         }
-                      );
-
-                    const canManage =
-                      isOwnMinistry(
-                        ministry._id
-                      );
-
-                    return (
-                      <div
-                        className={
-                          canManage
-                            ? "ministry-card own"
-                            : "ministry-card"
-                        }
-                        key={ministry._id}
                       >
+                        Edit
+                      </button>
 
-                        <div className="ministry-card-header">
+                      <button
+                        className="delete-button"
+                        onClick={() =>
+                          handleDeleteDepartment(
+                            department
+                          )
+                        }
+                      >
+                        Delete
+                      </button>
 
-                          <div className="ministry-title">
+                    </div>
+                  )}
 
-                            <div className="ministry-icon">
-                              M
-                            </div>
+                </div>
+              ))}
 
-                            <div>
-                              <h3>
-                                {ministry.name}
-                              </h3>
+              {ministryDepartments.length > 3 && (
+                  <div className="department-pagination">
 
-                              {canManage && (
-                                <span className="assigned-label">
-                                  Your Ministry
-                                </span>
-                              )}
-                            </div>
-
-                          </div>
-
-                          <span className="department-count">
-                            {ministryDepartments.length}
-                          </span>
-
-                        </div>
-
-                        <div className="department-heading">
-                          <span>
-                            Departments
-                          </span>
-
-                          <span>
-                            {ministryDepartments.length}
-                          </span>
-                        </div>
-
-                        <div className="department-list">
-
-                          {ministryDepartments.length ===
-                          0 ? (
-                            <p className="empty-text">
-                              No departments registered.
-                            </p>
-                          ) : (
-                            ministryDepartments.map(
-                              (department) => (
-                                <div
-                                  className="department-row"
-                                  key={department._id}
-                                >
-
-                                  <div className="department-name">
-
-                                    <span className="department-dot" />
-
-                                    <span>
-                                      {department.name}
-                                    </span>
-
-                                  </div>
-
-                                  {canManage && (
-                                    <div className="row-actions">
-
-                                      <button
-                                        className="edit-button"
-                                        onClick={() =>
-                                          openEditDepartment(
-                                            department
-                                          )
-                                        }
-                                      >
-                                        Edit
-                                      </button>
-
-                                      <button
-                                        className="delete-button"
-                                        onClick={() =>
-                                          handleDeleteDepartment(
-                                            department
-                                          )
-                                        }
-                                      >
-                                        Delete
-                                      </button>
-
-                                    </div>
-                                  )}
-
-                                </div>
-                              )
-                            )
+                    {visibleCount <
+                    ministryDepartments.length ? (
+                      <button
+                        className="show-more-button"
+                        onClick={() =>
+                          showMoreDepartments(
+                            ministry._id,
+                            ministryDepartments.length
+                          )
+                        }
+                      >
+                        Show More
+                        <span>
+                          +
+                          {Math.min(
+                            5,
+                            ministryDepartments.length -
+                              visibleCount
                           )}
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        className="show-more-button"
+                        onClick={() =>
+                          showLessDepartments(
+                            ministry._id
+                          )
+                        }
+                      >
+                        Show Less
+                      </button>
+                    )}
 
-                        </div>
-
-                        {canManage && (
-                          <button
-                            className="manage-department-button"
-                            onClick={() => {
-                              setActivePage(
-                                "departments"
-                              );
-                            }}
-                          >
-                            Manage My Departments →
-                          </button>
-                        )}
-
-                      </div>
-                    );
-                  })
+                  </div>
                 )}
 
+            </>
+          )}
+
+        </div>
+
+        {canManage && (
+          <button
+            className="manage-department-button"
+            onClick={() => {
+              setActivePage("departments");
+            }}
+          >
+            Manage My Departments →
+          </button>
+        )}
+
+      </div>
+    );
+  })
+)}
               </div>
             </section>
           )}
